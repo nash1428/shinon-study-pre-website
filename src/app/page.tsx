@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+const GITHUB_URL = "https://github.com/nash1428/shinon-study-pre-website";
+const BLD_WEB_URL = "https://shinon-study-pre-website-4b4066c4.onbld.com";
+
 const prototypes = [
   {
     href: "/notebook",
@@ -51,6 +54,38 @@ export default function Home() {
           </Link>
         ))}
       </div>
+
+      <section className="mt-12 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-xl font-semibold">Quick Access</h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          Download a text file with all links, or open them directly.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <a
+            href="/shinon-study-links.txt"
+            download
+            className="rounded bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Download Links (TXT)
+          </a>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            GitHub Repo
+          </a>
+          <a
+            href={BLD_WEB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Live Site
+          </a>
+        </div>
+      </section>
     </div>
   );
 }

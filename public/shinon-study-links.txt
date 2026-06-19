@@ -1,0 +1,46 @@
+=================================================
+Shinon Study Pre-Website - Important Links
+=================================================
+
+GITHUB REPOSITORY
+https://github.com/nash1428/shinon-study-pre-website
+
+LIVE WEBSITE (build.io)
+https://shinon-study-pre-website-4b4066c4.onbld.com
+
+-------------------------------------------------
+PROTOTYPE PAGES
+-------------------------------------------------
+Home / Hub
+https://shinon-study-pre-website-4b4066c4.onbld.com/
+
+1. Study Notebook (AI-assisted note-taking)
+https://shinon-study-pre-website-4b4066c4.onbld.com/notebook
+
+2. Concept Maps (Visual learning)
+https://shinon-study-pre-website-4b4066c4.onbld.com/concept-maps
+
+3. Interactive Exercises (Practice quizzes)
+https://shinon-study-pre-website-4b4066c4.onbld.com/interactive-exercises
+
+4. Flash Cards (Quick review)
+https://shinon-study-pre-website-4b4066c4.onbld.com/flash-cards
+
+5. Peer Guides (Curated resources)
+https://shinon-study-pre-website-4b4066c4.onbld.com/peer-guides
+
+-------------------------------------------------
+DEPLOYMENT COMMANDS
+-------------------------------------------------
+View logs:
+bld logs -a shinon-study-pre-website
+
+Set OpenAI API key (optional):
+bld config:set OPENAI_API_KEY=sk-... -a shinon-study-pre-website
+
+Restart app:
+bld ps:restart -a shinon-study-pre-website
+
+=================================================
+Generated: Thu Jun 19 2026
+=================================================
