@@ -3,20 +3,18 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 
-export default function NotebookPage() {
+export default function StudybookPage() {
   const [topic, setTopic] = useState("");
   const [content, setContent] = useState("");
   const [summary, setSummary] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"outline" | "summarise">("outline");
 
   async function generateOutline() {
     setLoading(true);
-    setMode("outline");
-    const res = await fetch("/api/generate-notebook", {
+    const res = await fetch("/api/studybook", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic }),
+      body: JSON.stringify({ topic, mode: "outline" }),
     });
     const data = await res.json();
     setLoading(false);
@@ -25,11 +23,10 @@ export default function NotebookPage() {
 
   async function summarise() {
     setLoading(true);
-    setMode("summarise");
-    const res = await fetch("/api/summarise", {
+    const res = await fetch("/api/studybook", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: content }),
+      body: JSON.stringify({ text: content, mode: "summarise" }),
     });
     const data = await res.json();
     setLoading(false);
@@ -38,10 +35,9 @@ export default function NotebookPage() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Study Notebook</h1>
+      <h1 className="text-2xl font-bold">Studybook</h1>
       <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-        Generate an AI-powered outline, jot your notes, then summarise in 3
-        minutes.
+        Organised, AI-assisted note-taking inspired by NotebookLM.
       </p>
 
       <div className="mt-6 flex gap-2">
@@ -56,7 +52,7 @@ export default function NotebookPage() {
           disabled={loading}
           className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          {loading && mode === "outline" ? "Loading…" : "Outline"}
+          {loading ? "Loading…" : "AI Outline"}
         </button>
       </div>
 
@@ -72,7 +68,7 @@ export default function NotebookPage() {
         disabled={loading || !content.trim()}
         className="mt-2 rounded bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
       >
-        {loading && mode === "summarise" ? "Loading…" : "Summarise"}
+        {loading ? "Loading…" : "Summarise"}
       </button>
 
       {content && (
@@ -80,7 +76,6 @@ export default function NotebookPage() {
           <ReactMarkdown>{content}</ReactMarkdown>
         </article>
       )}
-
       {summary && (
         <div className="mt-6 rounded bg-zinc-100 p-4 dark:bg-zinc-800">
           <h2 className="text-lg font-semibold">Key Takeaways</h2>

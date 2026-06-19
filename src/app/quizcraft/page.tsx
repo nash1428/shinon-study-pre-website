@@ -2,13 +2,9 @@
 
 import { useState } from "react";
 
-type Question = {
-  q: string;
-  options: string[];
-  answer: number;
-};
+type Question = { q: string; options: string[]; answer: number };
 
-export default function ExercisesPage() {
+export default function QuizcraftPage() {
   const [topic, setTopic] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
@@ -21,35 +17,28 @@ export default function ExercisesPage() {
     setFinished(false);
     setCurrent(0);
     setScore(0);
-    const res = await fetch("/api/gen-exercises", {
+    const res = await fetch("/api/quizcraft", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ topic }),
     });
     const data = await res.json();
     setLoading(false);
-    if (data.questions) {
-      setQuestions(data.questions);
-    }
+    if (data.questions) setQuestions(data.questions);
   }
 
   function handleAnswer(index: number) {
-    if (index === questions[current].answer) {
-      setScore((s) => s + 1);
-    }
-    if (current + 1 >= questions.length) {
-      setFinished(true);
-    } else {
-      setCurrent((c) => c + 1);
-    }
+    if (index === questions[current].answer) setScore((s) => s + 1);
+    if (current + 1 >= questions.length) setFinished(true);
+    else setCurrent((c) => c + 1);
   }
 
   if (!questions.length) {
     return (
       <section className="mx-auto max-w-xl px-4 py-12">
-        <h1 className="text-2xl font-bold">Interactive Exercises</h1>
+        <h1 className="text-2xl font-bold">Quizcraft</h1>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-          Generate practice questions on any topic.
+          Auto-generated practice questions with instant feedback.
         </p>
         <div className="mt-6 flex gap-2">
           <input
@@ -74,17 +63,14 @@ export default function ExercisesPage() {
 
   return (
     <section className="mx-auto max-w-xl px-4 py-12">
-      <h1 className="text-2xl font-bold">Interactive Exercises</h1>
+      <h1 className="text-2xl font-bold">Quizcraft</h1>
       {finished ? (
         <div className="mt-6 rounded bg-zinc-100 p-6 text-center dark:bg-zinc-900">
           <p className="text-lg font-semibold">
             Score: {score}/{questions.length}
           </p>
           <button
-            onClick={() => {
-              setQuestions([]);
-              setFinished(false);
-            }}
+            onClick={() => setQuestions([])}
             className="mt-4 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
             Try another topic

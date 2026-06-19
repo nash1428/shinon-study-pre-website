@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 type NodeItem = { id: string; label: string; x: number; y: number };
 type EdgeItem = { from: string; to: string };
 
-export default function ConceptMapsPage() {
+export default function BrainmapPage() {
   const [topic, setTopic] = useState("");
   const [nodes, setNodes] = useState<NodeItem[]>([
     { id: "1", label: "Main Idea", x: 300, y: 200 },
@@ -24,7 +24,7 @@ export default function ConceptMapsPage() {
 
   async function generateMap() {
     setLoading(true);
-    const res = await fetch("/api/generate-map", {
+    const res = await fetch("/api/brainmap", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ topic }),

@@ -19,11 +19,11 @@ export const metadata: Metadata = {
 
 const navItems = [
   { href: "/", label: "Home" },
-  { href: "/notebook", label: "Notebook" },
-  { href: "/concept-maps", label: "Concept Maps" },
-  { href: "/interactive-exercises", label: "Exercises" },
-  { href: "/flash-cards", label: "Flash Cards" },
-  { href: "/peer-guides", label: "Peer Guides" },
+  { href: "/studybook", label: "Studybook" },
+  { href: "/quizcraft", label: "Quizcraft" },
+  { href: "/brainmap", label: "Brainmap" },
+  { href: "/flashforge", label: "Flashforge" },
+  { href: "/coursecompass", label: "Coursecompass" },
 ];
 
 export default function RootLayout({
@@ -32,16 +32,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-white dark:bg-black text-black dark:text-white">
         <header className="border-b border-zinc-200 dark:border-zinc-800">
           <nav className="mx-auto flex max-w-5xl items-center gap-6 px-4 py-3 text-sm font-medium">
-            <span className="mr-auto text-base font-bold tracking-tight">
-              Shinon Study
-            </span>
+            <span className="mr-auto text-base font-bold tracking-tight">Shinon Study</span>
             {navItems.map((item) => (
               <a
                 key={item.href}

@@ -4,17 +4,13 @@ import { getOpenAI } from "@/lib/openai";
 export async function POST(req: Request) {
   try {
     const { topic } = await req.json();
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({
         questions: [
           {
             q: `What is a core concept of ${topic || "this topic"}?`,
-            options: [
-              "The main idea",
-              "An unrelated fact",
-              "A random guess",
-              "A historical date",
-            ],
+            options: ["The main idea", "An unrelated fact", "A random guess", "A historical date"],
             answer: 0,
           },
           {
@@ -22,9 +18,15 @@ export async function POST(req: Request) {
             options: ["Spacing", "Cramming", "Ignoring", "Guessing"],
             answer: 0,
           },
+          {
+            q: "What does active recall mean?",
+            options: ["Testing yourself", "Re-reading notes", "Highlighting text", "Listening to lectures"],
+            answer: 0,
+          },
         ],
       });
     }
+
     const completion = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
