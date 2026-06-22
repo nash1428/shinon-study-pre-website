@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import BottomNav, { type TabId } from "@/components/BottomNav";
+import Sidebar, { type TabId } from "@/components/Sidebar";
 import HomePage from "@/components/pages/HomePage";
 import NotesPage from "@/components/pages/NotesPage";
 import TasksPage from "@/components/pages/TasksPage";
@@ -25,13 +25,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* Main content — centered with max width, padded for bottom nav */}
-      <main className="mx-auto max-w-md pb-24">
-        {renderPage()}
-      </main>
+      {/* Fixed left sidebar */}
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Fixed bottom navigation */}
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Main content area — scrollable, offset for sidebar */}
+      <main className="ml-64 min-h-screen">
+        <div className="mx-auto max-w-6xl px-10 py-8">
+          {renderPage()}
+        </div>
+      </main>
     </div>
   );
 }

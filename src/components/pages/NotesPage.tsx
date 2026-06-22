@@ -5,28 +5,28 @@ import { recentNotes } from "@/lib/data";
 
 export default function NotesPage() {
   return (
-    <div className="page-enter px-5 py-6">
-      <h1 className="mb-1 text-2xl font-bold text-ink">Notes</h1>
-      <p className="mb-5 text-sm text-ink-soft">Your recent lecture notes & study materials</p>
+    <div className="page-enter">
+      <h1 className="mb-1 text-3xl font-bold text-ink">Notes</h1>
+      <p className="mb-6 text-sm text-ink-soft">Your recent lecture notes & study materials</p>
 
       {/* Action buttons */}
-      <div className="mb-5 grid grid-cols-2 gap-3">
-        <button className="flex items-center justify-center gap-2 rounded-xl bg-sage-500 px-4 py-3 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-sage-600">
+      <div className="mb-6 flex gap-3">
+        <button className="flex items-center gap-2 rounded-xl bg-sage-500 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-sage-600">
           <Upload className="h-4 w-4" />
-          Import PDF
+          Import Lecture PDF
         </button>
-        <button className="flex items-center justify-center gap-2 rounded-xl bg-lavender-300 px-4 py-3 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-lavender-400">
+        <button className="flex items-center gap-2 rounded-xl bg-lavender-300 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-lavender-400">
           <Layers className="h-4 w-4" />
-          Create Anki
+          Create Anki Card
         </button>
       </div>
 
-      {/* Note cards */}
-      <div className="space-y-3">
+      {/* Note cards — grid for wider layout */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {recentNotes.map((note) => (
           <div
             key={note.id}
-            className="cursor-pointer rounded-2xl bg-white p-4 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-float)]"
+            className="cursor-pointer rounded-2xl bg-white p-5 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-float)]"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -43,18 +43,13 @@ export default function NotesPage() {
                 {note.tag}
               </span>
             </div>
-            <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted">
+            <div className="mt-4 flex items-center gap-1.5 text-xs text-ink-muted">
               <FileText className="h-3 w-3" />
               {note.date}
             </div>
           </div>
         ))}
       </div>
-
-      {/* FAB */}
-      <button className="fixed bottom-24 right-5 flex h-14 w-14 items-center justify-center rounded-full bg-sage-500 text-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95">
-        <Plus className="h-6 w-6" />
-      </button>
     </div>
   );
 }

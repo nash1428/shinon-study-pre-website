@@ -22,7 +22,7 @@ export default function TasksPage() {
 
   const TaskItem = ({ task, list }: { task: Task; list: "today" | "upcoming" }) => (
     <div
-      className={`flex items-center gap-3 py-3 transition-opacity ${
+      className={`flex items-center gap-3 py-3.5 transition-opacity ${
         task.done ? "opacity-40" : "opacity-100"
       }`}
     >
@@ -49,33 +49,35 @@ export default function TasksPage() {
   const todayCount = today.filter((t) => !t.done).length;
 
   return (
-    <div className="page-enter px-5 py-6">
-      <h1 className="text-2xl font-bold text-ink">Tasks</h1>
-      <p className="mb-5 text-sm text-ink-soft">
+    <div className="page-enter">
+      <h1 className="text-3xl font-bold text-ink">Tasks</h1>
+      <p className="mb-6 text-sm text-ink-soft">
         {todayCount} remaining today
       </p>
 
-      {/* Today */}
-      <div className="mb-6">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-          Today
-        </h2>
-        <div className="divide-y divide-stone-100 rounded-2xl bg-white px-4 shadow-[var(--shadow-card)]">
-          {today.map((task) => (
-            <TaskItem key={task.id} task={task} list="today" />
-          ))}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Today */}
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Today
+          </h2>
+          <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
+            {today.map((task) => (
+              <TaskItem key={task.id} task={task} list="today" />
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Upcoming */}
-      <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-          Upcoming
-        </h2>
-        <div className="divide-y divide-stone-100 rounded-2xl bg-white px-4 shadow-[var(--shadow-card)]">
-          {upcoming.map((task) => (
-            <TaskItem key={task.id} task={task} list="upcoming" />
-          ))}
+        {/* Upcoming */}
+        <div>
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+            Upcoming
+          </h2>
+          <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
+            {upcoming.map((task) => (
+              <TaskItem key={task.id} task={task} list="upcoming" />
+            ))}
+          </div>
         </div>
       </div>
     </div>
