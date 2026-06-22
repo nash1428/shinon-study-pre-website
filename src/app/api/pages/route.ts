@@ -1,21 +1,27 @@
 import { NextResponse } from "next/server";
-import { listPages, createPage } from "@/lib/pageStore";
+import { getAllPages, createPage } from "@/lib/store";
 
 export async function GET() {
   try {
-    const pages = await listPages();
-    return NextResponse.json({ pages });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to list pages" }, { status: 500 });
+    const pages = getAllPages();
+    return NextResponse.json(pages);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Request failed" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const record = await createPage(body.content, body.title);
-    return NextResponse.json({ id: record.id, page: record });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Failed to create page" }, { status: 500 });
+    const { title, parentId } = await req.json();
+    const page = createPage(title, parentId ?? null);
+    return NextResponse.json(page);
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Request failed" },
+      { status: 500 }
+    );
   }
 }

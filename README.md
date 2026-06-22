@@ -1,42 +1,55 @@
-# Shinon Study Pre-Website
+# Study Notebook — Organised NotebookLM
 
-5 prototype learning tools in one Next.js app, deployed on build.io.
+A block-based notebook with AI summarisation, hybrid search, knowledge graph suggestions, and real-time collaboration.
 
-## Prototypes
+## Features
 
-| Route | Description |
-|---|---|
-| `/studybook` | NotebookLM-style AI outline + summarise |
-| `/quizcraft` | Auto-generated multiple-choice quizzes |
-| `/brainmap` | AI-generated concept maps (SVG canvas) |
-| `/flashforge` | Spaced-repetition flashcards with SRS grading |
-| `/coursecompass` | AI-curated learning resource paths |
+- **Block editor** — heading, paragraph, toggle, callout, list, quote, code, image, embed, table, divider, AI assistant
+- **AI summarisation** — each block can be summarised via Google Gemini / OpenAI
+- **Hierarchical notebooks** — Course → Chapter → Sub-chapter tree
+- **Hybrid search** — PostgreSQL full-text + Qdrant vector search
+- **Knowledge graph** — AI suggests related concepts in a side panel
+- **Real-time collaboration** — Yjs WebSocket sync (placeholder)
+- **Drag-and-drop** — dnd-kit powered block reordering
 
-## Local Development
+## Quick Start (Docker)
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:4000
+- Qdrant: http://localhost:6333
+- Yjs WebSocket: ws://localhost:1234
+
+## Quick Start (without Docker)
 
 ```bash
 npm install
 npm run dev
 ```
 
-Add your `OPENAI_API_KEY` to `.env.local` for real AI generation.
+## API Routes
 
-## Deployment
+| Method | Endpoint | Body | Returns |
+|--------|----------|------|---------|
+| GET | `/api/pages` | — | All pages |
+| POST | `/api/pages` | `{ title, parentId }` | New page |
+| GET | `/api/pages/:id` | — | Page JSON |
+| DELETE | `/api/pages/:id` | — | — |
+| PATCH | `/api/blocks/:id` | `{ pageId, updates }` | Updated block |
+| POST | `/api/ai/summarise` | `{ blockId, pageId }` | `{ summary }` |
+| POST | `/api/search` | `{ query }` | `{ results }` |
+| POST | `/api/graph/suggest` | `{ text }` | `{ suggestions }` |
 
-```bash
-# Push to GitHub
-git push origin main
+## Production TODO
 
-# Deploy to build.io
-git push bld main
-```
-
-## TODO Checklist for Production
-
-- [ ] Add persistent database (PostgreSQL / Supabase)
-- [ ] Implement user authentication (OAuth / JWT)
-- [ ] Add error boundaries and toast notifications
-- [ ] Add rate limiting for AI API routes
-- [ ] Responsive mobile polish
-- [ ] Add analytics / user feedback collection
-Fri Jun 19 12:47:40 UTC 2026
+- [ ] Replace in-memory store with PostgreSQL (Supabase)
+- [ ] Implement real Supabase Auth (email + Google SSO)
+- [ ] Wire up Qdrant for vector embeddings (text-embedding-3-large)
+- [ ] Enable Yjs WebSocket for real-time collaboration
+- [ ] Add rate limiting for AI endpoints
+- [ ] Add media CDN for image/video uploads
+- [ ] Production Dockerfile (multi-stage build)
+- [ ] SSR / SEO for public pages
