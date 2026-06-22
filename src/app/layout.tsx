@@ -24,6 +24,7 @@ const navItems = [
   { href: "/brainmap", label: "Brainmap" },
   { href: "/flashforge", label: "Flashforge" },
   { href: "/coursecompass", label: "Coursecompass" },
+  { href: "/notion", label: "Notion" },
 ];
 
 export default function RootLayout({

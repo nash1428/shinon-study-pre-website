@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ff-1",
+    "type": "heading",
+    "data": { "text": "Spanish Vocabulary – Week 3", "level": 1 }
+  },
+  {
+    "id": "ff-2",
+    "type": "table",
+    "data": {
+      "headers": ["Front", "Back", "Example"],
+      "rows": [
+        ["la biblioteca", "the library", "Estudio en la biblioteca."],
+        ["el restaurante", "the restaurant", "Ceno en el restaurante."],
+        ["la estación", "the station", "El tren llega a la estación."],
+        ["el parque", "the park", "Paseo por el parque."]
+      ]
+    }
+  },
+  {
+    "id": "ff-3",
+    "type": "divider",
+    "data": {}
+  },
+  {
+    "id": "ff-4",
+    "type": "code",
+    "data": {
+      "language": "latex",
+      "text": "% LaTeX formula example\\nE = mc^2"
+    }
+  },
+  {
+    "id": "ff-5",
+    "type": "ai_assistant",
+    "data": { "prompt": "Create flashcards from a PDF page" }
+  }
+]

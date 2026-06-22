@@ -1,0 +1,82 @@
+[
+  {
+    "id": "qc-1",
+    "type": "heading",
+    "data": { "text": "Physics Quiz Bank", "level": 1 }
+  },
+  {
+    "id": "qc-2",
+    "type": "divider",
+    "data": {}
+  },
+  {
+    "id": "qc-3",
+    "type": "bulleted_list",
+    "data": { "text": "Newton's Laws of Motion" }
+  },
+  {
+    "id": "qc-4",
+    "type": "bulleted_list",
+    "data": { "text": "Work, Energy and Power" }
+  },
+  {
+    "id": "qc-5",
+    "type": "bulleted_list",
+    "data": { "text": "Gravitation and Orbital Mechanics" }
+  },
+  {
+    "id": "qc-6",
+    "type": "toggle",
+    "data": { "title": "Question 1: Newton's First Law", "open": false },
+    "children": [
+      {
+        "id": "qc-6-1",
+        "type": "paragraph",
+        "data": { "text": "An object at rest stays at rest and an object in motion stays in motion with the same speed and in the same direction unless acted upon by an unbalanced force." }
+      },
+      {
+        "id": "qc-6-2",
+        "type": "code",
+        "data": {
+          "language": "text",
+          "text": "A) Force causes motion\nB) Inertia resists changes in motion\nC) Acceleration is proportional to mass\nD) Every action has an equal reaction"
+        }
+      },
+      {
+        "id": "qc-6-3",
+        "type": "callout",
+        "data": { "icon": "✅", "text": "Correct answer: B. Newton's First Law is also known as the Law of Inertia." }
+      }
+    ]
+  },
+  {
+    "id": "qc-7",
+    "type": "toggle",
+    "data": { "title": "Question 2: Kinetic Energy", "open": false },
+    "children": [
+      {
+        "id": "qc-7-1",
+        "type": "paragraph",
+        "data": { "text": "What is the kinetic energy of a 2 kg object moving at 3 m/s?" }
+      },
+      {
+        "id": "qc-7-2",
+        "type": "code",
+        "data": {
+          "language": "text",
+          "text": "A) 3 J\nB) 6 J\nC) 9 J\nD) 18 J"
+        }
+      },
+      {
+        "id": "qc-7-3",
+        "type": "callout",
+        "data": { "icon": "✅", "text": "Correct answer: C. KE = ½mv² = ½ × 2 × 9 = 9 J." }
+      }
+    ]
+  },
+  {
+    "id": "qc-8",
+    "type": "ai_assistant",
+    "data": { "prompt": "Generate more questions" }
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "bm-1",
+    "type": "heading",
+    "data": { "text": "Project Planning Map", "level": 1 }
+  },
+  {
+    "id": "bm-2",
+    "type": "embed",
+    "data": { "url": "https://embed.example.com/canvas/123" }
+  },
+  {
+    "id": "bm-3",
+    "type": "paragraph",
+    "data": { "text": "Use the canvas above to visualise your project plan. Drag nodes to reorganise, double-click to edit labels, and connect related items with edges." }
+  },
+  {
+    "id": "bm-4",
+    "type": "bulleted_list",
+    "data": { "text": "Central node: Project Goal" }
+  },
+  {
+    "id": "bm-5",
+    "type": "bulleted_list",
+    "data": { "text": "Branch 1: Research & Requirements" }
+  },
+  {
+    "id": "bm-6",
+    "type": "bulleted_list",
+    "data": { "text": "Branch 2: Design & Prototyping" }
+  },
+  {
+    "id": "bm-7",
+    "type": "bulleted_list",
+    "data": { "text": "Branch 3: Development & Testing" }
+  },
+  {
+    "id": "bm-8",
+    "type": "ai_assistant",
+    "data": { "prompt": "Suggest related nodes" }
+  }
+]

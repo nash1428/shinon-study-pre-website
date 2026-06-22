@@ -1,0 +1,93 @@
+[
+  {
+    "id": "cc-1",
+    "type": "heading",
+    "data": { "text": "Data-Science Learning Path", "level": 1 }
+  },
+  {
+    "id": "cc-2",
+    "type": "numbered_list",
+    "data": { "text": "Week 1 – Python Foundations", "index": 1 }
+  },
+  {
+    "id": "cc-3",
+    "type": "embed",
+    "data": { "url": "https://www.youtube.com/embed/8DvywoWv6fI" }
+  },
+  {
+    "id": "cc-4",
+    "type": "paragraph",
+    "data": { "text": "Learn Python syntax, data types, control flow, and functions." }
+  },
+  {
+    "id": "cc-5",
+    "type": "table",
+    "data": {
+      "headers": ["Resource", "Type"],
+      "rows": [
+        ["Automate the Boring Stuff", "Book"],
+        ["Python for Everybody (Coursera)", "Video Course"],
+        ["LeetCode Easy Python", "Practice"]
+      ]
+    }
+  },
+  {
+    "id": "cc-6",
+    "type": "numbered_list",
+    "data": { "text": "Week 2 – Pandas & NumPy", "index": 2 }
+  },
+  {
+    "id": "cc-7",
+    "type": "embed",
+    "data": { "url": "https://www.youtube.com/embed/vmEHCJofslg" }
+  },
+  {
+    "id": "cc-8",
+    "type": "paragraph",
+    "data": { "text": "Master numerical computing and data manipulation with Pandas and NumPy." }
+  },
+  {
+    "id": "cc-9",
+    "type": "table",
+    "data": {
+      "headers": ["Resource", "Type"],
+      "rows": [
+        ["Python Data Science Handbook", "Book"],
+        ["Kaggle Learn Pandas", "Interactive"],
+        ["NumPy Quickstart Tutorial", "Docs"]
+      ]
+    }
+  },
+  {
+    "id": "cc-10",
+    "type": "numbered_list",
+    "data": { "text": "Week 3 – Data Visualisation", "index": 3 }
+  },
+  {
+    "id": "cc-11",
+    "type": "paragraph",
+    "data": { "text": "Cover Matplotlib, Seaborn, and Plotly for creating insightful charts." }
+  },
+  {
+    "id": "cc-12",
+    "type": "table",
+    "data": {
+      "headers": ["Resource", "Type"],
+      "rows": [
+        ["Matplotlib Gallery", "Reference"],
+        ["Seaborn Tutorial", "Docs"],
+        ["Plotly Express Guide", "Interactive"]
+      ]
+    }
+  },
+  {
+    "id": "cc-13",
+    "type": "divider",
+    "data": {}
+  },
+  {
+    "id": "cc-14",
+    "type": "ai_assistant",
+    "data": { "prompt": "Refine week 3 topics" }
+  }
+]

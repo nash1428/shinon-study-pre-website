@@ -1,0 +1,47 @@
+[
+  {
+    "id": "sb-1",
+    "type": "heading",
+    "data": { "text": "My Biology Course", "level": 1 }
+  },
+  {
+    "id": "sb-2",
+    "type": "toggle",
+    "data": { "title": "Chapter 1 – Cell Structure", "open": true },
+    "children": [
+      {
+        "id": "sb-2-1",
+        "type": "paragraph",
+        "data": { "text": "• The cell is the basic unit of life. All living organisms are composed of one or more cells.\n• Cells arise from pre-existing cells through cell division.\n• The cell membrane encloses the cytoplasm and regulates what enters and exits the cell." }
+      },
+      {
+        "id": "sb-2-2",
+        "type": "callout",
+        "data": { "icon": "🔬", "text": "Key concepts: membrane, organelle, cytoskeleton, nucleus, mitochondria, ribosome" }
+      }
+    ]
+  },
+  {
+    "id": "sb-3",
+    "type": "table",
+    "data": {
+      "headers": ["Term", "Definition"],
+      "rows": [
+        ["Membrane", "A lipid bilayer that encloses the cell and controls transport"],
+        ["Mitochondria", "Powerhouse of the cell; produces ATP via cellular respiration"],
+        ["Ribosome", "Molecular machine that synthesises proteins from mRNA"],
+        ["Nucleus", "Membrane-bound organelle that contains genetic material"]
+      ]
+    }
+  },
+  {
+    "id": "sb-4",
+    "type": "divider",
+    "data": {}
+  },
+  {
+    "id": "sb-5",
+    "type": "ai_assistant",
+    "data": { "prompt": "Ask for a concept map of Chapter 1" }
+  }
+]

@@ -6,6 +6,7 @@ const prototypes = [
   { href: "/brainmap", title: "Brainmap", description: "Visualise ideas and relationships to deepen understanding.", color: "bg-pink-600" },
   { href: "/flashforge", title: "Flashforge", description: "Spaced-repetition flashcards for long-term retention.", color: "bg-orange-600" },
   { href: "/coursecompass", title: "Coursecompass", description: "AI-curated learning paths and peer-reviewed resources.", color: "bg-teal-600" },
+  { href: "/notion", title: "Notion Builder", description: "Notion-style block editor for structured study pages.", color: "bg-indigo-600" },
 ];
 
 export default function Home() {
