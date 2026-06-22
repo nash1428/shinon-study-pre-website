@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Study Notebook — Organised NotebookLM",
-  description: "A block-based notebook with AI summarisation, search, and knowledge graph",
+  title: "Study App — Small steps every day",
+  description: "A calm, organized study companion for students",
 };
 
 export default function RootLayout({
@@ -11,7 +11,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }
