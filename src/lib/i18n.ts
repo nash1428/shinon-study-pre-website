@@ -1,0 +1,118 @@
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+
+const resources = {
+  en: {
+    translation: {
+      // Sidebar
+      "app.title": "StudySpace",
+      "app.tagline": "Small steps every day",
+      "sidebar.menu": "Menu",
+      "sidebar.home": "Home",
+      "sidebar.notes": "Notes",
+      "sidebar.tasks": "Task Tracker",
+      "sidebar.search": "Search",
+
+      // Language toggle
+      "lang.toggle": "EN | JP",
+
+      // Home page
+      "home.greeting.morning": "Good morning",
+      "home.greeting.afternoon": "Good afternoon",
+      "home.greeting.evening": "Good evening",
+      "home.quote": "Small steps every day.",
+      "home.calendar.title": "June 2026",
+      "home.calendar.today": "Today",
+      "home.calendar.hasEvents": "Has events",
+      "home.week.title": "This Week",
+      "home.week.noEvents": "No events",
+      "home.profile.university": "Stanford University",
+      "home.profile.semester": "Spring 2026 · Semester 4",
+
+      // Notes page
+      "notes.title": "Notes",
+      "notes.subtitle": "Your recent lecture notes & study materials",
+      "notes.importPdf": "Import Lecture PDF",
+      "notes.createAnki": "Create Anki Card",
+
+      // Tasks page
+      "tasks.title": "Tasks",
+      "tasks.remaining": "remaining today",
+      "tasks.today": "Today",
+      "tasks.upcoming": "Upcoming",
+
+      // Search page
+      "search.title": "Search",
+      "search.placeholder": "Search your study materials...",
+      "search.subtitle": "Search across Notes, Tasks, and Schedule.",
+      "search.recent": "Recent Searches",
+      "search.categories": "Browse by Category",
+      "search.noRecent": "No recent searches.",
+      "search.cat.notes": "Notes",
+      "search.cat.tasks": "Tasks",
+      "search.cat.schedule": "Schedule",
+      "search.cat.anki": "Anki Decks",
+    },
+  },
+  jp: {
+    translation: {
+      // Sidebar
+      "app.title": "StudySpace",
+      "app.tagline": "毎日少しずつ",
+      "sidebar.menu": "メニュー",
+      "sidebar.home": "ホーム",
+      "sidebar.notes": "ノート",
+      "sidebar.tasks": "タスク",
+      "sidebar.search": "検索",
+
+      // Language toggle
+      "lang.toggle": "EN | JP",
+
+      // Home page
+      "home.greeting.morning": "おはよう",
+      "home.greeting.afternoon": "こんにちは",
+      "home.greeting.evening": "こんばんは",
+      "home.quote": "毎日少しずつ。",
+      "home.calendar.title": "2026年6月",
+      "home.calendar.today": "今日",
+      "home.calendar.hasEvents": "予定あり",
+      "home.week.title": "今週の予定",
+      "home.week.noEvents": "予定なし",
+      "home.profile.university": "スタンフォード大学",
+      "home.profile.semester": "2026年春 · セメスター4",
+
+      // Notes page
+      "notes.title": "ノート",
+      "notes.subtitle": "最近の講義ノートと学習資料",
+      "notes.importPdf": "PDFをインポート",
+      "notes.createAnki": "Ankiカード作成",
+
+      // Tasks page
+      "tasks.title": "タスク",
+      "tasks.remaining": "件の残りタスク（今日）",
+      "tasks.today": "今日",
+      "tasks.upcoming": "今後の予定",
+
+      // Search page
+      "search.title": "検索",
+      "search.placeholder": "学習資料を検索...",
+      "search.subtitle": "ノート、タスク、スケジュール全体を検索。",
+      "search.recent": "最近の検索",
+      "search.categories": "カテゴリーで探す",
+      "search.noRecent": "最近の検索はありません。",
+      "search.cat.notes": "ノート",
+      "search.cat.tasks": "タスク",
+      "search.cat.schedule": "スケジュール",
+      "search.cat.anki": "Ankiデッキ",
+    },
+  },
+};
+
+i18n.use(initReactI18next).init({
+  resources,
+  lng: "en",
+  fallbackLng: "en",
+  interpolation: { escapeValue: false },
+});
+
+export default i18n;

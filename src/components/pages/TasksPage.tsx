@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { todayTasks, upcomingTasks } from "@/lib/data";
 
 interface Task {
@@ -11,6 +12,7 @@ interface Task {
 }
 
 export default function TasksPage() {
+  const { t } = useTranslation();
   const [today, setToday] = useState<Task[]>(todayTasks);
   const [upcoming, setUpcoming] = useState<Task[]>(upcomingTasks);
 
@@ -50,16 +52,16 @@ export default function TasksPage() {
 
   return (
     <div className="page-enter">
-      <h1 className="text-3xl font-bold text-ink">Tasks</h1>
+      <h1 className="text-3xl font-bold text-ink">{t("tasks.title")}</h1>
       <p className="mb-6 text-sm text-ink-soft">
-        {todayCount} remaining today
+        {todayCount} {t("tasks.remaining")}
       </p>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Today */}
         <div>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Today
+            {t("tasks.today")}
           </h2>
           <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
             {today.map((task) => (
@@ -71,7 +73,7 @@ export default function TasksPage() {
         {/* Upcoming */}
         <div>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Upcoming
+            {t("tasks.upcoming")}
           </h2>
           <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
             {upcoming.map((task) => (

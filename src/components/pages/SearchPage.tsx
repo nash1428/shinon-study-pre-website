@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { Search, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { recentSearches } from "@/lib/data";
 
 export default function SearchPage() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState(recentSearches);
 
@@ -12,9 +14,16 @@ export default function SearchPage() {
     setRecent(recent.filter((r) => r !== item));
   };
 
+  const categories = [
+    { key: "search.cat.notes", color: "bg-sage-50 text-sage-700", count: "24" },
+    { key: "search.cat.tasks", color: "bg-lavender-50 text-lavender-500", count: "7" },
+    { key: "search.cat.schedule", color: "bg-blue-50 text-blue-500", count: "4" },
+    { key: "search.cat.anki", color: "bg-amber-50 text-amber-600", count: "12" },
+  ];
+
   return (
     <div className="page-enter">
-      <h1 className="mb-4 text-3xl font-bold text-ink">Search</h1>
+      <h1 className="mb-4 text-3xl font-bold text-ink">{t("search.title")}</h1>
 
       {/* Search bar */}
       <div className="relative mb-3">
@@ -23,23 +32,21 @@ export default function SearchPage() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search your study materials..."
+          placeholder={t("search.placeholder")}
           className="w-full rounded-2xl border border-stone-200 bg-white py-3.5 pl-12 pr-4 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-4 focus:ring-sage-100"
         />
       </div>
-      <p className="mb-8 text-xs text-ink-muted">
-        Search across Notes, Tasks, and Schedule.
-      </p>
+      <p className="mb-8 text-xs text-ink-muted">{t("search.subtitle")}</p>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* Recent searches */}
         <div>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Recent Searches
+            {t("search.recent")}
           </h2>
           <div className="flex flex-wrap gap-2">
             {recent.length === 0 ? (
-              <p className="text-sm text-ink-muted">No recent searches.</p>
+              <p className="text-sm text-ink-muted">{t("search.noRecent")}</p>
             ) : (
               recent.map((item) => (
                 <div
@@ -62,20 +69,15 @@ export default function SearchPage() {
         {/* Categories */}
         <div>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            Browse by Category
+            {t("search.categories")}
           </h2>
           <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Notes", color: "bg-sage-50 text-sage-700", count: "24" },
-              { label: "Tasks", color: "bg-lavender-50 text-lavender-500", count: "7" },
-              { label: "Schedule", color: "bg-blue-50 text-blue-500", count: "4" },
-              { label: "Anki Decks", color: "bg-amber-50 text-amber-600", count: "12" },
-            ].map((cat) => (
+            {categories.map((cat) => (
               <button
-                key={cat.label}
+                key={cat.key}
                 className={`flex items-center justify-between rounded-2xl px-4 py-3.5 text-left ${cat.color}`}
               >
-                <span className="text-sm font-medium">{cat.label}</span>
+                <span className="text-sm font-medium">{t(cat.key)}</span>
                 <span className="text-xs opacity-60">{cat.count}</span>
               </button>
             ))}

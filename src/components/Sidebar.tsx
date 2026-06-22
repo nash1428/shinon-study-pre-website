@@ -1,6 +1,7 @@
 "use client";
 
 import { Home, NotebookPen, ListChecks, Search, GraduationCap } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export type TabId = "home" | "notes" | "tasks" | "search";
 
@@ -9,14 +10,16 @@ interface SidebarProps {
   onTabChange: (tab: TabId) => void;
 }
 
-const navItems: { id: TabId; label: string; icon: typeof Home }[] = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "notes", label: "Notes", icon: NotebookPen },
-  { id: "tasks", label: "Tasks", icon: ListChecks },
-  { id: "search", label: "Search", icon: Search },
+const navItems: { id: TabId; labelKey: string; icon: typeof Home }[] = [
+  { id: "home", labelKey: "sidebar.home", icon: Home },
+  { id: "notes", labelKey: "sidebar.notes", icon: NotebookPen },
+  { id: "tasks", labelKey: "sidebar.tasks", icon: ListChecks },
+  { id: "search", labelKey: "sidebar.search", icon: Search },
 ];
 
 export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+  const { t } = useTranslation();
+
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-stone-200/60 bg-cream">
       {/* Header — App title + logo */}
@@ -25,15 +28,15 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           <GraduationCap className="h-5 w-5 text-white" strokeWidth={2.2} />
         </div>
         <div>
-          <h1 className="text-base font-bold text-ink tracking-tight">StudySpace</h1>
-          <p className="text-[10px] text-ink-muted">Small steps every day</p>
+          <h1 className="text-base font-bold text-ink tracking-tight">{t("app.title")}</h1>
+          <p className="text-[10px] text-ink-muted">{t("app.tagline")}</p>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-2">
         <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
-          Menu
+          {t("sidebar.menu")}
         </p>
         <div className="space-y-1">
           {navItems.map((item) => {
@@ -55,7 +58,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                   }`}
                   strokeWidth={isActive ? 2.4 : 2}
                 />
-                {item.label}
+                {t(item.labelKey)}
                 {isActive && (
                   <div className="ml-auto h-1.5 w-1.5 rounded-full bg-sage-500" />
                 )}
@@ -73,7 +76,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="truncate text-sm font-medium text-ink">Shinon</p>
-            <p className="truncate text-[11px] text-ink-muted">Stanford University</p>
+            <p className="truncate text-[11px] text-ink-muted">{t("home.profile.university")}</p>
           </div>
         </div>
       </div>

@@ -1,27 +1,30 @@
 "use client";
 
 import { FileText, Plus, Upload, Layers } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { recentNotes } from "@/lib/data";
 
 export default function NotesPage() {
+  const { t } = useTranslation();
+
   return (
     <div className="page-enter">
-      <h1 className="mb-1 text-3xl font-bold text-ink">Notes</h1>
-      <p className="mb-6 text-sm text-ink-soft">Your recent lecture notes & study materials</p>
+      <h1 className="mb-1 text-3xl font-bold text-ink">{t("notes.title")}</h1>
+      <p className="mb-6 text-sm text-ink-soft">{t("notes.subtitle")}</p>
 
       {/* Action buttons */}
       <div className="mb-6 flex gap-3">
         <button className="flex items-center gap-2 rounded-xl bg-sage-500 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-sage-600">
           <Upload className="h-4 w-4" />
-          Import Lecture PDF
+          {t("notes.importPdf")}
         </button>
         <button className="flex items-center gap-2 rounded-xl bg-lavender-300 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-lavender-400">
           <Layers className="h-4 w-4" />
-          Create Anki Card
+          {t("notes.createAnki")}
         </button>
       </div>
 
-      {/* Note cards — grid for wider layout */}
+      {/* Note cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {recentNotes.map((note) => (
           <div
