@@ -194,20 +194,6 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
-      {/* Profile card */}
-      <div className="mt-6 rounded-2xl bg-white p-5 shadow-[var(--shadow-card)]">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-sage-100 text-xl font-bold text-sage-700">
-            {userData.name[0]}
-          </div>
-          <div className="flex-1">
-            <h2 className="text-base font-semibold text-ink">{userData.name}</h2>
-            <p className="text-xs text-ink-soft">{t("home.profile.university")}</p>
-            <p className="mt-0.5 text-xs text-ink-muted">{t("home.profile.semester")}</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

@@ -13,6 +13,19 @@ const resources = {
       "sidebar.tasks": "Task Tracker",
       "sidebar.search": "Search",
 
+      // Profile section
+      "profile.name": "Name",
+      "profile.university": "University",
+      "profile.semester": "Semester",
+      "profile.degree": "Degree",
+      "profile.major": "Major / Courses",
+      "profile.email": "Email",
+      "profile.hometown": "Hometown",
+      "profile.location": "Current Location",
+      "profile.private": "Private Account",
+      "profile.save": "Save Changes",
+      "profile.cancel": "Cancel",
+
       // Language toggle
       "lang.toggle": "EN | JP",
 
@@ -64,6 +77,19 @@ const resources = {
       "sidebar.notes": "ノート",
       "sidebar.tasks": "タスク",
       "sidebar.search": "検索",
+
+      // Profile section
+      "profile.name": "名前",
+      "profile.university": "大学",
+      "profile.semester": "学期",
+      "profile.degree": "学位",
+      "profile.major": "専攻 / 科目",
+      "profile.email": "メール",
+      "profile.hometown": "出身地",
+      "profile.location": "現在地",
+      "profile.private": "プライベートアカウント",
+      "profile.save": "変更を保存",
+      "profile.cancel": "キャンセル",
 
       // Language toggle
       "lang.toggle": "EN | JP",
