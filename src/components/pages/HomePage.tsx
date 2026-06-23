@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/AuthContext";
 import { motivationalQuotes } from "@/lib/data";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const monthsEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -53,7 +54,7 @@ export default function HomePage() {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [expandedLecture, setExpandedLecture] = useState<string | null>(null);
-  const [lectureNotes, setLectureNotes] = useState<Record<string, { pdfName: string | null; note: string }>>({});
+  const [lectureNotes, setLectureNotes] = useLocalStorage<Record<string, { pdfName: string | null; note: string }>>("studyspace_lecture_notes", {});
 
   // Fetch Google Calendar events when month changes
   useEffect(() => {

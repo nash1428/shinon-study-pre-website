@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { todayTasks, upcomingTasks, type TaskItem } from "@/lib/data";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 interface Task {
   id: number;
@@ -13,8 +14,8 @@ interface Task {
 
 export default function TasksPage() {
   const { t } = useTranslation();
-  const [today, setToday] = useState<Task[]>(todayTasks as Task[]);
-  const [upcoming, setUpcoming] = useState<Task[]>(upcomingTasks as Task[]);
+  const [today, setToday] = useLocalStorage<Task[]>("studyspace_tasks_today", todayTasks as Task[]);
+  const [upcoming, setUpcoming] = useLocalStorage<Task[]>("studyspace_tasks_upcoming", upcomingTasks as Task[]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskList, setNewTaskList] = useState<"today" | "upcoming">("today");
   const [showAddForm, setShowAddForm] = useState(false);

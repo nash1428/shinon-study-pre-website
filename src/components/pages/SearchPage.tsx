@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentSearches as initialRecent } from "@/lib/data";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export default function SearchPage() {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const [recent, setRecent] = useState(initialRecent);
+  const [recent, setRecent] = useLocalStorage<string[]>("studyspace_recent_searches", initialRecent);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const categories = [

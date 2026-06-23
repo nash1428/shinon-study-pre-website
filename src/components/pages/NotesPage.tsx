@@ -4,10 +4,11 @@ import { useState } from "react";
 import { FileText, Plus, Upload, Layers, X, FileUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentNotes as initialNotes, type NoteItem } from "@/lib/data";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export default function NotesPage() {
   const { t } = useTranslation();
-  const [notes, setNotes] = useState<NoteItem[]>(initialNotes);
+  const [notes, setNotes] = useLocalStorage<NoteItem[]>("studyspace_notes", initialNotes);
   const [modalOpen, setModalOpen] = useState<null | "pdf" | "anki" | "note">(null);
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
