@@ -57,18 +57,24 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
   const [draft, setDraft] = useState<UserProfile>(profileData || defaultProfile);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync profile data from auth context when it changes
+  // Sync profile data from auth context ONLY when not editing
+  // (prevents overwriting user's in-progress edits when background fetch completes)
   useEffect(() => {
-    if (profileData) {
+    if (profileData && !isExpanded) {
       setDraft(profileData);
     }
-  }, [profileData]);
+  }, [profileData, isExpanded]);
 
   const profile = profileData || defaultProfile;
 
   const handleSave = async () => {
-    await saveProfile(draft);
-    setIsExpanded(false);
+    try {
+      await saveProfile(draft);
+      setIsExpanded(false);
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+      // TODO: Show error toast to user
+    }
   };
 
   const handleCancel = () => {
