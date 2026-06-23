@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Sparkles, ChevronLeft, ChevronRight, Clock, MapPin,
-  FileText, X, ChevronDown, ChevronUp,
+  FileText, X, ChevronDown, ChevronUp, Calendar, Loader2, Unlink,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/AuthContext";
 import { motivationalQuotes } from "@/lib/data";
+import { useGoogleCalendar, type GoogleCalendarEvent } from "@/hooks/useGoogleCalendar";
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const currentDay = 22;
@@ -15,8 +16,8 @@ const daysInMonth = 30;
 const firstDayOffset = 0;
 const deadlineDays = [5, 12, 18, 22, 25, 28];
 
-// Events keyed by day number
-const calendarEvents: Record<number, { time: string; title: string; room: string }[]> = {
+// Placeholder events (used when Google Calendar is not connected)
+const placeholderEvents: Record<number, { time: string; title: string; room: string }[]> = {
   5: [{ time: "09:00 AM", title: "Data Structures", room: "Gates 100" }],
   12: [{ time: "11:00 AM", title: "Macroeconomics", room: "Econ 220" }],
   18: [{ time: "02:00 PM", title: "Linear Algebra", room: "Math 340" }],
@@ -76,16 +77,51 @@ export default function HomePage() {
   const hour = new Date().getHours();
   const greetingKey = hour < 12 ? "home.greeting.morning" : hour < 18 ? "home.greeting.afternoon" : "home.greeting.evening";
 
+  const googleCal = useGoogleCalendar();
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [expandedLecture, setExpandedLecture] = useState<string | null>(null);
   const [lectureNotes, setLectureNotes] = useState<Record<string, { pdfName: string | null; note: string }>>({});
+
+  // Merge Google Calendar events with placeholder events
+  const mergedEvents = useMemo(() => {
+    const merged: Record<number, { time: string; title: string; room: string }[]> = {};
+
+    // Add placeholder events (only if Google Calendar is not connected)
+    if (!googleCal.isConnected) {
+      Object.entries(placeholderEvents).forEach(([day, events]) => {
+        const dayNum = parseInt(day);
+        if (!merged[dayNum]) merged[dayNum] = [];
+        merged[dayNum].push(...events);
+      });
+    }
+
+    // Add Google Calendar events
+    Object.entries(googleCal.eventsByDay).forEach(([day, events]) => {
+      const dayNum = parseInt(day);
+      if (!merged[dayNum]) merged[dayNum] = [];
+      events.forEach((event) => {
+        const timeStr = event.start
+          ? new Date(event.start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+          : "All day";
+        merged[dayNum].push({
+          time: timeStr,
+          title: event.title,
+          room: event.location || "",
+        });
+      });
+    });
+
+    return merged;
+  }, [googleCal.isConnected, googleCal.eventsByDay]);
+
+  const mergedDeadlineDays = useMemo(() => Object.keys(mergedEvents).map(Number), [mergedEvents]);
 
   const calendarCells: (number | null)[] = [];
   for (let i = 0; i < firstDayOffset; i++) calendarCells.push(null);
   for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
 
   const handleDayClick = (day: number) => {
-    if (deadlineDays.includes(day)) {
+    if (mergedDeadlineDays.includes(day)) {
       setSelectedDay(selectedDay === day ? null : day);
     }
   };
@@ -121,7 +157,33 @@ export default function HomePage() {
           <div className="rounded-2xl bg-white p-6 shadow-[var(--shadow-card)]">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-ink">{t("home.calendar.title")}</h2>
-              <div className="flex gap-1">
+              <div className="flex items-center gap-2">
+                {/* Google Calendar connect/disconnect button */}
+                {googleCal.isConfigured && (
+                  googleCal.isConnected ? (
+                    <button
+                      onClick={googleCal.disconnect}
+                      className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1 text-[11px] font-medium text-ink-soft transition-colors hover:bg-red-50 hover:text-red-500 hover:border-red-200"
+                      title="Disconnect Google Calendar"
+                    >
+                      <Unlink className="h-3 w-3" />
+                      {isJp ? "切断" : "Disconnect"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={googleCal.connect}
+                      disabled={googleCal.loading}
+                      className="flex items-center gap-1.5 rounded-lg bg-sage-500 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-sage-600 disabled:opacity-50"
+                    >
+                      {googleCal.loading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Calendar className="h-3 w-3" />
+                      )}
+                      {isJp ? "Googleカレンダー" : "Google Calendar"}
+                    </button>
+                  )
+                )}
                 <button className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100">
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -130,6 +192,23 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
+
+            {/* Error message */}
+            {googleCal.error && (
+              <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-[11px] text-red-500">
+                {googleCal.error}
+              </div>
+            )}
+
+            {/* Connected status badge */}
+            {googleCal.isConnected && (
+              <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-sage-50 px-3 py-1.5 text-[11px] text-sage-700">
+                <Calendar className="h-3 w-3" />
+                {isJp ? "Googleカレンダーと連携中" : "Connected to Google Calendar"}
+                <span className="text-sage-400">·</span>
+                {googleCal.events.length} {isJp ? "件" : "events"}
+              </div>
+            )}
 
             <div className="mb-2 grid grid-cols-7 gap-1">
               {daysOfWeek.map((day) => (
@@ -141,7 +220,7 @@ export default function HomePage() {
 
             <div className="grid grid-cols-7 gap-1">
               {calendarCells.map((day, i) => {
-                const hasEvent = day !== null && deadlineDays.includes(day);
+                const hasEvent = day !== null && mergedDeadlineDays.includes(day);
                 const isToday = day === currentDay;
                 const isSelected = day === selectedDay;
                 return (
@@ -171,7 +250,7 @@ export default function HomePage() {
             </div>
 
             {/* Selected day events popover */}
-            {selectedDay && calendarEvents[selectedDay] && (
+            {selectedDay && mergedEvents[selectedDay] && (
               <div className="mt-4 rounded-xl bg-sage-50 p-4 ring-1 ring-sage-200">
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-sage-700">
@@ -185,12 +264,12 @@ export default function HomePage() {
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {calendarEvents[selectedDay].map((event, ei) => (
+                  {mergedEvents[selectedDay].map((event, ei) => (
                     <div key={ei} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
                       <div className="h-2 w-2 rounded-full bg-sage-400 shrink-0" />
                       <div className="flex-1">
                         <p className="text-xs font-medium text-ink">{event.title}</p>
-                        <p className="text-[10px] text-ink-muted">{event.room}</p>
+                        {event.room && <p className="text-[10px] text-ink-muted">{event.room}</p>}
                       </div>
                       <span className="text-[10px] text-ink-soft">{event.time}</span>
                     </div>
@@ -272,7 +351,6 @@ export default function HomePage() {
                               {/* Expanded lecture section */}
                               {isExpanded && (
                                 <div className="mt-1 rounded-xl bg-sage-50 p-4 ring-1 ring-sage-200">
-                                  {/* Lecture details */}
                                   <div className="space-y-2">
                                     <div className="flex items-center gap-2">
                                       <span className="w-16 text-[10px] font-medium text-ink-muted">{isJp ? "講義名" : "Lecture"}</span>
@@ -288,7 +366,6 @@ export default function HomePage() {
                                     </div>
                                   </div>
 
-                                  {/* PDF attachment */}
                                   <div className="mt-3 border-t border-sage-200/50 pt-3">
                                     <span className="mb-1.5 block text-[10px] font-medium text-ink-muted">
                                       {isJp ? "講義PDF" : "Lecture PDF"}
@@ -315,7 +392,6 @@ export default function HomePage() {
                                     )}
                                   </div>
 
-                                  {/* Quick notes */}
                                   <div className="mt-3 border-t border-sage-200/50 pt-3">
                                     <span className="mb-1 block text-[10px] font-medium text-ink-muted">
                                       {isJp ? "ノート" : "Quick Notes"}
