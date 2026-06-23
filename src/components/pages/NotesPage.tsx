@@ -10,6 +10,13 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<NoteItem[]>(initialNotes);
   const [modalOpen, setModalOpen] = useState<null | "pdf" | "anki" | "note">(null);
   const [newTitle, setNewTitle] = useState("");
+  const [newBody, setNewBody] = useState("");
+
+  const closeModal = () => {
+    setModalOpen(null);
+    setNewTitle("");
+    setNewBody("");
+  };
 
   const handleCreate = () => {
     if (!newTitle.trim()) return;
@@ -19,11 +26,10 @@ export default function NotesPage() {
       title: newTitle.trim(),
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       tag,
-      excerpt: modalOpen === "pdf" ? "PDF lecture notes (click to view)..." : "Anki card deck...",
+      excerpt: newBody.trim() || (modalOpen === "pdf" ? "PDF lecture notes (click to view)..." : "Anki card deck..."),
     };
     setNotes([newNote, ...notes]);
-    setNewTitle("");
-    setModalOpen(null);
+    closeModal();
   };
 
   return (
@@ -31,15 +37,8 @@ export default function NotesPage() {
       <h1 className="mb-1 text-3xl font-bold text-ink">{t("notes.title")}</h1>
       <p className="mb-6 text-sm text-ink-soft">{t("notes.subtitle")}</p>
 
-      {/* Action buttons */}
+      {/* Action buttons (Import PDF + Create Anki remain at top) */}
       <div className="mb-6 flex gap-3">
-        <button
-          onClick={() => setModalOpen("note")}
-          className="flex items-center gap-2 rounded-xl bg-sage-500 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-sage-600"
-        >
-          <Plus className="h-4 w-4" />
-          New Note
-        </button>
         <button
           onClick={() => setModalOpen("pdf")}
           className="flex items-center gap-2 rounded-xl bg-lavender-300 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-lavender-400"
@@ -88,14 +87,23 @@ export default function NotesPage() {
         ))}
       </div>
 
+      {/* Floating action button — bottom-right, plus icon only */}
+      <button
+        onClick={() => setModalOpen("note")}
+        className="fixed bottom-8 right-8 flex h-14 w-14 items-center justify-center rounded-full bg-sage-500 text-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95 z-50"
+        title="New Note"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+
       {/* Modal */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
-          onClick={() => { setModalOpen(null); setNewTitle(""); }}
+          onClick={closeModal}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-[var(--shadow-float)]"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--shadow-float)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
@@ -103,7 +111,7 @@ export default function NotesPage() {
                 {modalOpen === "pdf" ? t("notes.importPdf") : modalOpen === "anki" ? t("notes.createAnki") : "New Note"}
               </h2>
               <button
-                onClick={() => { setModalOpen(null); setNewTitle(""); }}
+                onClick={closeModal}
                 className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100"
               >
                 <X className="h-4 w-4" />
@@ -120,9 +128,22 @@ export default function NotesPage() {
                   autoFocus
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                   placeholder={modalOpen === "pdf" ? "e.g., Lecture 5 — Graph Algorithms" : "e.g., Chapter 3 Review"}
                   className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                />
+              </div>
+
+              {/* Note body / content textarea */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">
+                  {modalOpen === "anki" ? "Card content" : "Note content"}
+                </label>
+                <textarea
+                  value={newBody}
+                  onChange={(e) => setNewBody(e.target.value)}
+                  placeholder="Type your note content here..."
+                  rows={4}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100 resize-y min-h-[100px]"
                 />
               </div>
 
