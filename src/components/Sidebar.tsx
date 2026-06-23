@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import {
   Home, NotebookPen, ListChecks, Search, GraduationCap,
   ChevronUp, X, Check, Camera, Trash2,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +13,8 @@ export type TabId = "home" | "notes" | "tasks" | "search";
 interface SidebarProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 const navItems: { id: TabId; labelKey: string; icon: typeof Home }[] = [
@@ -58,7 +61,7 @@ const profileFields: { key: keyof Omit<ProfileData, "isPrivate" | "avatarUrl">; 
   { key: "location", labelKey: "profile.location" },
 ];
 
-export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleCollapse }: SidebarProps) {
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
@@ -87,6 +90,11 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     setDraft({ ...draft, avatarUrl: null });
   };
 
+  // When collapsed, clicking the avatar expands the whole sidebar
+  const handleAvatarClickCollapsed = () => {
+    onToggleCollapse();
+  };
+
   const Avatar = ({ size, url, name }: { size: number; url: string | null; name: string }) => {
     if (url) {
       return (
@@ -109,7 +117,11 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   };
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-stone-200/60 bg-cream">
+    <aside
+      className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-stone-200/60 bg-cream transition-all duration-300 ${
+        isCollapsed ? "w-16" : "w-64"
+      }`}
+    >
       {/* Hidden file input for avatar upload */}
       <input
         ref={fileInputRef}
@@ -119,22 +131,48 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         className="hidden"
       />
 
-      {/* Header — App title + logo */}
-      <div className="flex items-center gap-2.5 px-6 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sage-500 shadow-[var(--shadow-soft)]">
+      {/* Header — logo + collapse toggle */}
+      <div className={`flex items-center py-6 ${isCollapsed ? "justify-center px-2" : "gap-2.5 px-6"}`}>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sage-500 shadow-[var(--shadow-soft)]">
           <GraduationCap className="h-5 w-5 text-white" strokeWidth={2.2} />
         </div>
-        <div>
-          <h1 className="text-base font-bold text-ink tracking-tight">{t("app.title")}</h1>
-          <p className="text-[10px] text-ink-muted">{t("app.tagline")}</p>
-        </div>
+        {!isCollapsed && (
+          <div className="flex-1 overflow-hidden">
+            <h1 className="text-base font-bold text-ink tracking-tight">{t("app.title")}</h1>
+            <p className="text-[10px] text-ink-muted">{t("app.tagline")}</p>
+          </div>
+        )}
+        {!isCollapsed && (
+          <button
+            onClick={onToggleCollapse}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-200/50 transition-colors"
+            title="Collapse"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        )}
       </div>
+
+      {/* Expand button when collapsed */}
+      {isCollapsed && (
+        <div className="px-2">
+          <button
+            onClick={onToggleCollapse}
+            className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-200/50 transition-colors"
+            title="Expand"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-2">
-        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
-          {t("sidebar.menu")}
-        </p>
+        {!isCollapsed && (
+          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+            {t("sidebar.menu")}
+          </p>
+        )}
         <div className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -143,20 +181,23 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                title={isCollapsed ? t(item.labelKey) : undefined}
+                className={`flex w-full items-center gap-3 rounded-xl transition-all duration-200 ${
+                  isCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                } text-sm font-medium ${
                   isActive
                     ? "bg-sage-100 text-sage-700"
                     : "text-ink-soft hover:bg-stone-200/40 hover:text-ink"
                 }`}
               >
                 <Icon
-                  className={`h-[18px] w-[18px] transition-colors duration-200 ${
+                  className={`h-[18px] w-[18px] shrink-0 transition-colors duration-200 ${
                     isActive ? "text-sage-600" : "text-ink-muted"
                   }`}
                   strokeWidth={isActive ? 2.4 : 2}
                 />
-                {t(item.labelKey)}
-                {isActive && (
+                {!isCollapsed && t(item.labelKey)}
+                {!isCollapsed && isActive && (
                   <div className="ml-auto h-1.5 w-1.5 rounded-full bg-sage-500" />
                 )}
               </button>
@@ -167,12 +208,25 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
       {/* Expandable Profile Section */}
       <div className="border-t border-stone-200/60">
-        {isExpanded ? (
+        {isCollapsed ? (
+          /* Collapsed sidebar — just avatar, click to expand sidebar */
+          <button
+            onClick={handleAvatarClickCollapsed}
+            className="flex w-full items-center justify-center py-4 transition-colors hover:bg-stone-200/30"
+            title={profile.name}
+          >
+            <div className="relative group/avatar">
+              <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover/avatar:opacity-100">
+                <PanelLeftOpen className="h-4 w-4 text-white" />
+              </div>
+            </div>
+          </button>
+        ) : isExpanded ? (
           /* Expanded — editable form */
           <div className="max-h-[70vh] overflow-y-auto px-4 pb-4">
             {/* Avatar uploader + close */}
             <div className="flex items-center gap-3 py-3">
-              {/* Hover-overlay avatar */}
               <div className="relative group/avatar">
                 <Avatar size={48} url={draft.avatarUrl} name={draft.name} />
                 <button
@@ -261,7 +315,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
             </div>
           </div>
         ) : (
-          /* Collapsed — avatar + name + chevron */
+          /* Collapsed profile — avatar + name + chevron */
           <button
             onClick={() => {
               setDraft(profile);

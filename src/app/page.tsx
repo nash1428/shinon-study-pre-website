@@ -11,6 +11,7 @@ import SearchPage from "@/components/pages/SearchPage";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const renderPage = () => {
     switch (activeTab) {
@@ -27,11 +28,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* Fixed left sidebar */}
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Collapsible fixed left sidebar */}
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
 
-      {/* Main content area */}
-      <main className="ml-64 min-h-screen">
+      {/* Main content area — margin adapts to sidebar state */}
+      <main className={`min-h-screen transition-all duration-300 ${
+        sidebarCollapsed ? "ml-16" : "ml-64"
+      }`}>
         {/* Sticky top header bar */}
         <header className="sticky top-0 z-30 flex items-center justify-end border-b border-stone-200/60 bg-cream/90 px-10 py-3 backdrop-blur-lg">
           <LanguageToggle />
