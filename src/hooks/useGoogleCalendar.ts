@@ -4,8 +4,8 @@ import { useState, useCallback, useEffect } from "react";
 
 // Google OAuth Client ID — replace with your own from Google Cloud Console
 // https://console.cloud.google.com/apis/credentials
-const GOOGLE_CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";
-const GOOGLE_API_KEY = "YOUR_API_KEY";
+const GOOGLE_CLIENT_ID = "337419547217-io5ke2ja6149mad4e7n31csor5qeq1mu.apps.googleusercontent.com";
+const GOOGLE_API_KEY = "AIzaSyBU_9HhkdYu4Fw2mBdvXeh8e0CvkzJW8b0";
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 
 export interface GoogleCalendarEvent {
