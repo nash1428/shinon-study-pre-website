@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 
 const GOOGLE_CLIENT_ID = "337419547217-io5ke2ja6149mad4e7n31csor5qeq1mu.apps.googleusercontent.com";
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+const TOKEN_KEY = "studyspace_google_token";
+const EVENTS_CACHE_KEY = "studyspace_google_events_cache";
 
 export interface GoogleCalendarEvent {
   id: string;
@@ -30,11 +32,12 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const tokenRef = useRef<string | null>(null);
+  const tokenClientRef = useRef<any>(null);
 
   const isConfigured = !GOOGLE_CLIENT_ID.includes("YOUR_CLIENT_ID");
 
-  // Fetch events using plain fetch (no GAPI library needed)
-  const fetchEvents = useCallback(async (accessToken: string) => {
+  // Fetch events using plain fetch
+  const fetchEvents = useCallback(async (accessToken: string): Promise<boolean> => {
     try {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -52,8 +55,10 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       });
 
       if (!res.ok) {
-        const body = await res.text();
-        console.error("Calendar API error:", res.status, body);
+        if (res.status === 401) {
+          // Token expired — caller should re-auth
+          return false;
+        }
         throw new Error(`Calendar API returned ${res.status}`);
       }
 
@@ -69,21 +74,20 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       }));
 
       setEvents(mapped);
+      setError(""); // clear any previous error
+
+      // Cache events in localStorage so they survive token expiry
+      try {
+        localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(mapped));
+      } catch {}
+
+      return true;
     } catch (err: any) {
       console.error("Fetch events error:", err);
       setError(err?.message || "Failed to fetch calendar events");
+      return false;
     }
   }, []);
-
-  // Check for existing token on mount
-  useEffect(() => {
-    const token = localStorage.getItem("studyspace_google_token");
-    if (token) {
-      tokenRef.current = token;
-      setIsConnected(true);
-      fetchEvents(token);
-    }
-  }, [fetchEvents]);
 
   // Load Google Identity Services script
   const loadGoogleScript = useCallback((): Promise<void> => {
@@ -99,46 +103,113 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     });
   }, []);
 
+  // Initialize token client (used for both initial auth and silent re-auth)
+  const ensureTokenClient = useCallback(async () => {
+    await loadGoogleScript();
+
+    if (!tokenClientRef.current) {
+      tokenClientRef.current = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: CALENDAR_SCOPE,
+        callback: () => {}, // Will be overridden per-request
+      });
+    }
+
+    return tokenClientRef.current;
+  }, [loadGoogleScript]);
+
+  // Silently refresh token (no popup if already authorized)
+  const refreshToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const client = await ensureTokenClient();
+
+      return new Promise<string | null>((resolve) => {
+        client.callback = (response: any) => {
+          if (response.error) {
+            resolve(null);
+            return;
+          }
+          const token = response.access_token;
+          tokenRef.current = token;
+          localStorage.setItem(TOKEN_KEY, token);
+          resolve(token);
+        };
+
+        // prompt: "" means no popup if user already authorized
+        client.requestAccessToken({ prompt: "" });
+      });
+    } catch {
+      return null;
+    }
+  }, [ensureTokenClient]);
+
+  // On mount: try to restore session + cached events
+  useEffect(() => {
+    // Load cached events immediately (shows something while checking token)
+    try {
+      const cached = localStorage.getItem(EVENTS_CACHE_KEY);
+      if (cached) {
+        setEvents(JSON.parse(cached));
+      }
+    } catch {}
+
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    // We have a token — set as connected and try to fetch
+    tokenRef.current = token;
+    setIsConnected(true);
+
+    (async () => {
+      const success = await fetchEvents(token);
+      if (!success) {
+        // Token expired — try silent refresh
+        const newToken = await refreshToken();
+        if (newToken) {
+          await fetchEvents(newToken);
+        }
+        // If refresh fails too, keep cached events visible
+      }
+    })();
+  }, [fetchEvents, refreshToken]);
+
+  // Initial connect (with popup)
   const connect = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      await loadGoogleScript();
+      const client = await ensureTokenClient();
 
-      const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: CALENDAR_SCOPE,
-        callback: (response: any) => {
-          if (response.error) {
-            setError(response.error_description || response.error || "Authorization failed");
-            setLoading(false);
-            return;
-          }
-
-          const token = response.access_token;
-          tokenRef.current = token;
-          localStorage.setItem("studyspace_google_token", token);
-          setIsConnected(true);
-          fetchEvents(token);
+      client.callback = async (response: any) => {
+        if (response.error) {
+          setError(response.error_description || response.error || "Authorization failed");
           setLoading(false);
-        },
-      });
+          return;
+        }
 
-      tokenClient.requestAccessToken({ prompt: "consent" });
+        const token = response.access_token;
+        tokenRef.current = token;
+        localStorage.setItem(TOKEN_KEY, token);
+        setIsConnected(true);
+        await fetchEvents(token);
+        setLoading(false);
+      };
+
+      client.requestAccessToken({ prompt: "consent" });
     } catch (err: any) {
       setError(err?.message || "Failed to connect to Google Calendar");
       setLoading(false);
     }
-  }, [loadGoogleScript, fetchEvents]);
+  }, [ensureTokenClient, fetchEvents]);
 
   const disconnect = useCallback(() => {
     const token = tokenRef.current;
     if (token) {
-      // Revoke the token
       fetch(`https://oauth2.googleapis.com/revoke?token=${token}`).catch(() => {});
     }
-    localStorage.removeItem("studyspace_google_token");
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(EVENTS_CACHE_KEY);
     tokenRef.current = null;
     setIsConnected(false);
     setEvents([]);
