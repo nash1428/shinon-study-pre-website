@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   Home, NotebookPen, ListChecks, Search,
   ChevronUp, X, Check, Camera, Trash2,
-  PanelLeftClose, PanelLeftOpen, LogOut,
+  PanelLeftClose, PanelLeftOpen, LogOut, Loader2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth, type UserProfile } from "@/lib/AuthContext";
@@ -56,10 +56,10 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
   const { saveProfile, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [draft, setDraft] = useState<UserProfile>(profileData || defaultProfile);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync profile data from auth context ONLY when not editing
-  // (prevents overwriting user's in-progress edits when background fetch completes)
   useEffect(() => {
     if (profileData && !isExpanded) {
       setDraft(profileData);
@@ -69,12 +69,18 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
   const profile = profileData || defaultProfile;
 
   const handleSave = async () => {
+    setSaveStatus("saving");
     try {
       await saveProfile(draft);
-      setIsExpanded(false);
+      setSaveStatus("saved");
+      setTimeout(() => {
+        setIsExpanded(false);
+        setSaveStatus("idle");
+      }, 800);
     } catch (err) {
       console.error("Failed to save profile:", err);
-      // TODO: Show error toast to user
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 2000);
     }
   };
 
@@ -302,10 +308,18 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
             <div className="mt-3 flex gap-2">
               <button
                 onClick={handleSave}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-sage-500 py-2 text-xs font-medium text-white transition-colors hover:bg-sage-600"
+                disabled={saveStatus === "saving"}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-colors ${
+                  saveStatus === "saved"
+                    ? "bg-green-500"
+                    : saveStatus === "error"
+                    ? "bg-red-400"
+                    : "bg-sage-500 hover:bg-sage-600"
+                } disabled:opacity-50`}
               >
-                <Check className="h-3 w-3" />
-                {t("profile.save")}
+                {saveStatus === "saving" && <Loader2 className="h-3 w-3 animate-spin" />}
+                {saveStatus === "saved" && <Check className="h-3 w-3" />}
+                {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : t("profile.save")}
               </button>
               <button
                 onClick={handleCancel}

@@ -75,6 +75,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Check localStorage backup first (fast, works offline)
+    try {
+      const backup = localStorage.getItem("studyspace_profile_backup");
+      if (backup) {
+        const parsed = JSON.parse(backup) as UserProfile;
+        profileCache.set(uid, parsed);
+        setProfile(parsed);
+        // Still fetch from Firestore in background to get latest
+      }
+    } catch {}
+
     // Set a temporary profile from the auth user so UI renders instantly
     const tempProfile = { ...defaultProfile, ...fallback } as UserProfile;
     setProfile(tempProfile);
@@ -88,16 +99,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const fetched = docSnap.data() as UserProfile;
         profileCache.set(uid, fetched);
         setProfile(fetched);
+        // Update localStorage backup with latest from Firestore
+        try {
+          localStorage.setItem("studyspace_profile_backup", JSON.stringify(fetched));
+        } catch {}
       } else {
         // Create default profile for new users
         const newProfile = { ...defaultProfile, ...fallback } as UserProfile;
         await setDoc(docRef, newProfile);
         profileCache.set(uid, newProfile);
         setProfile(newProfile);
+        try {
+          localStorage.setItem("studyspace_profile_backup", JSON.stringify(newProfile));
+        } catch {}
       }
     } catch (err) {
-      // If Firestore fails, keep the temp profile — app still works
-      console.error("Profile fetch failed:", err);
+      // If Firestore fails, try localStorage backup
+      console.error("Profile fetch failed, trying localStorage:", err);
+      try {
+        const backup = localStorage.getItem("studyspace_profile_backup");
+        if (backup) {
+          const parsed = JSON.parse(backup) as UserProfile;
+          profileCache.set(uid, parsed);
+          setProfile(parsed);
+        }
+      } catch {}
     }
   }, []);
 
@@ -159,14 +185,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const saveProfile = useCallback(async (updatedProfile: UserProfile) => {
+    // Update local state immediately
     setProfile(updatedProfile);
-    if (user) {
-      profileCache.set(user.uid, updatedProfile);
+
+    // Get the current user directly from Firebase auth (more reliable than state)
+    const currentUser = auth?.currentUser;
+
+    if (currentUser) {
+      // Update in-memory cache
+      profileCache.set(currentUser.uid, updatedProfile);
+
+      // Save to localStorage as backup
+      try {
+        localStorage.setItem("studyspace_profile_backup", JSON.stringify(updatedProfile));
+      } catch {}
+
+      // Save to Firestore
+      if (db) {
+        try {
+          await setDoc(doc(db, "users", currentUser.uid), updatedProfile);
+        } catch (err) {
+          console.error("Firestore save failed, using localStorage backup:", err);
+        }
+      }
+    } else {
+      // Fallback: save to localStorage even if user is somehow null
+      try {
+        localStorage.setItem("studyspace_profile_backup", JSON.stringify(updatedProfile));
+      } catch {}
     }
-    if (user && db) {
-      await setDoc(doc(db, "users", user.uid), updatedProfile);
-    }
-  }, [user]);
+  }, []);
 
   return (
     <AuthContext.Provider
