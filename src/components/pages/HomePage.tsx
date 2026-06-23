@@ -116,6 +116,19 @@ export default function HomePage() {
 
   const mergedDeadlineDays = useMemo(() => Object.keys(mergedEvents).map(Number), [mergedEvents]);
 
+  // Compute the current week's Monday–Friday day numbers (synced with monthly calendar)
+  const weekDays = useMemo(() => {
+    const dow = (currentDay - 1) % 7; // 0=Sun, 1=Mon, ..., 6=Sat (June 1 is Sunday)
+    const monday = dow === 0 ? currentDay + 1 : currentDay - dow + 1;
+    return [
+      { day: monday, label: "Monday", labelJp: "月曜日" },
+      { day: monday + 1, label: "Tuesday", labelJp: "火曜日" },
+      { day: monday + 2, label: "Wednesday", labelJp: "水曜日" },
+      { day: monday + 3, label: "Thursday", labelJp: "木曜日" },
+      { day: monday + 4, label: "Friday", labelJp: "金曜日" },
+    ];
+  }, []);
+
   const calendarCells: (number | null)[] = [];
   for (let i = 0; i < firstDayOffset; i++) calendarCells.push(null);
   for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
@@ -300,118 +313,136 @@ export default function HomePage() {
               <div className="absolute left-[68px] top-2 bottom-2 w-px bg-stone-200" />
 
               <div className="space-y-4">
-                {weekSchedule.map((day, idx) => (
-                  <div key={idx} className="flex gap-4">
-                    <div className="flex w-[60px] flex-col items-end pt-0.5">
-                      <span className="text-xs font-semibold text-ink">
-                        {isJp ? day.dayJp : day.day}
-                      </span>
-                    </div>
+                {weekDays.map((dayInfo, idx) => {
+                  const dayEvents = mergedEvents[dayInfo.day] || [];
+                  const isDaySelected = selectedDay === dayInfo.day;
 
-                    <div className="relative flex w-[16px] shrink-0 justify-center pt-1.5">
-                      <div className={`h-2.5 w-2.5 rounded-full border-2 border-white ${
-                        day.events.length > 0 ? "bg-sage-400" : "bg-stone-300"
-                      }`} />
-                    </div>
+                  return (
+                    <div key={idx} className="flex gap-4">
+                      <div className="flex w-[60px] flex-col items-end pt-0.5">
+                        <button
+                          onClick={() => setSelectedDay(isDaySelected ? null : dayInfo.day)}
+                          className={`text-xs font-semibold transition-colors ${
+                            isDaySelected ? "text-sage-600" : "text-ink hover:text-sage-500"
+                          }`}
+                        >
+                          {isJp ? dayInfo.labelJp : dayInfo.label}
+                        </button>
+                        <span className="text-[10px] text-ink-muted">Jun {dayInfo.day}</span>
+                      </div>
 
-                    <div className="flex-1 space-y-2 pb-1">
-                      {day.events.length === 0 ? (
-                        <p className="py-1 text-xs text-ink-muted">{t("home.week.noEvents")}</p>
-                      ) : (
-                        day.events.map((event, ei) => {
-                          const lectureId = `${day.day}-${ei}`;
-                          const isExpanded = expandedLecture === lectureId;
-                          const lectureData = lectureNotes[lectureId] || { pdfName: null, note: "" };
+                      <div className="relative flex w-[16px] shrink-0 justify-center pt-1.5">
+                        <div className={`h-2.5 w-2.5 rounded-full border-2 border-white ${
+                          dayEvents.length > 0 ? "bg-sage-400" : "bg-stone-300"
+                        } ${isDaySelected ? "ring-2 ring-sage-200" : ""}`} />
+                      </div>
 
-                          return (
-                            <div key={ei}>
-                              {/* Lecture card (clickable) */}
-                              <button
-                                onClick={() => handleLectureClick(lectureId)}
-                                className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-all ${
-                                  isExpanded
-                                    ? "bg-sage-50 ring-1 ring-sage-200"
-                                    : "bg-cream-dark hover:bg-stone-100"
-                                }`}
-                              >
-                                <div className={`h-2 w-2 rounded-full shrink-0 ${
-                                  event.color === "sage" ? "bg-sage-400" : "bg-lavender-300"
-                                }`} />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-ink truncate">{event.title}</p>
-                                  <p className="text-[11px] text-ink-muted truncate">{event.time} · {event.room}</p>
-                                </div>
-                                {isExpanded ? (
-                                  <ChevronUp className="h-4 w-4 text-ink-muted shrink-0" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4 text-ink-muted shrink-0" />
-                                )}
-                              </button>
+                      <div className={`flex-1 space-y-2 pb-1 rounded-xl p-1.5 -m-1.5 transition-colors ${
+                        isDaySelected ? "bg-sage-50" : ""
+                      }`}>
+                        {dayEvents.length === 0 ? (
+                          <p className="py-1 text-xs text-ink-muted">{t("home.week.noEvents")}</p>
+                        ) : (
+                          dayEvents.map((event, ei) => {
+                            const lectureId = `day${dayInfo.day}-${ei}`;
+                            const isExpanded = expandedLecture === lectureId;
+                            const lectureData = lectureNotes[lectureId] || { pdfName: null, note: "" };
 
-                              {/* Expanded lecture section */}
-                              {isExpanded && (
-                                <div className="mt-1 rounded-xl bg-sage-50 p-4 ring-1 ring-sage-200">
-                                  <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className="w-16 text-[10px] font-medium text-ink-muted">{isJp ? "講義名" : "Lecture"}</span>
-                                      <span className="text-sm text-ink">{event.title}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="h-3 w-3 text-ink-muted" />
-                                      <span className="text-xs text-ink-soft">{event.time}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <MapPin className="h-3 w-3 text-ink-muted" />
-                                      <span className="text-xs text-ink-soft">{event.room}</span>
-                                    </div>
+                            return (
+                              <div key={ei}>
+                                {/* Lecture card (clickable) */}
+                                <button
+                                  onClick={() => {
+                                    handleLectureClick(lectureId);
+                                    setSelectedDay(dayInfo.day);
+                                  }}
+                                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-all ${
+                                      isExpanded
+                                        ? "bg-sage-50 ring-1 ring-sage-200"
+                                        : "bg-cream-dark hover:bg-stone-100"
+                                    }`}
+                                >
+                                  <div className={`h-2 w-2 rounded-full shrink-0 ${
+                                    ei % 2 === 0 ? "bg-sage-400" : "bg-lavender-300"
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-ink truncate">{event.title}</p>
+                                    <p className="text-[11px] text-ink-muted truncate">{event.time}{event.room ? ` · ${event.room}` : ""}</p>
                                   </div>
+                                  {isExpanded ? (
+                                    <ChevronUp className="h-4 w-4 text-ink-muted shrink-0" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-ink-muted shrink-0" />
+                                  )}
+                                </button>
 
-                                  <div className="mt-3 border-t border-sage-200/50 pt-3">
-                                    <span className="mb-1.5 block text-[10px] font-medium text-ink-muted">
-                                      {isJp ? "講義PDF" : "Lecture PDF"}
-                                    </span>
-                                    {lectureData.pdfName ? (
-                                      <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
-                                        <FileText className="h-4 w-4 text-red-400" />
-                                        <span className="flex-1 text-xs text-ink">{lectureData.pdfName}</span>
-                                        <button
-                                          onClick={() => updateLectureData(lectureId, { pdfName: null })}
-                                          className="text-ink-muted hover:text-red-400"
-                                        >
-                                          <X className="h-3 w-3" />
-                                        </button>
+                                {/* Expanded lecture section */}
+                                {isExpanded && (
+                                  <div className="mt-1 rounded-xl bg-sage-50 p-4 ring-1 ring-sage-200">
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="w-16 text-[10px] font-medium text-ink-muted">{isJp ? "講義名" : "Lecture"}</span>
+                                        <span className="text-sm text-ink">{event.title}</span>
                                       </div>
-                                    ) : (
-                                      <button
-                                        onClick={() => updateLectureData(lectureId, { pdfName: "lecture_notes.pdf" })}
-                                        className="flex items-center gap-1.5 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs text-ink-muted hover:border-sage-400 hover:text-sage-600 transition-colors"
-                                      >
-                                        <FileText className="h-3 w-3" />
-                                        {isJp ? "PDFを添付" : "Attach Lecture PDF"}
-                                      </button>
-                                    )}
-                                  </div>
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-3 w-3 text-ink-muted" />
+                                        <span className="text-xs text-ink-soft">{event.time}</span>
+                                      </div>
+                                      {event.room && (
+                                        <div className="flex items-center gap-2">
+                                          <MapPin className="h-3 w-3 text-ink-muted" />
+                                          <span className="text-xs text-ink-soft">{event.room}</span>
+                                        </div>
+                                      )}
+                                    </div>
 
-                                  <div className="mt-3 border-t border-sage-200/50 pt-3">
-                                    <span className="mb-1 block text-[10px] font-medium text-ink-muted">
-                                      {isJp ? "ノート" : "Quick Notes"}
-                                    </span>
-                                    <textarea
-                                      value={lectureData.note}
-                                      onChange={(e) => updateLectureData(lectureId, { note: e.target.value })}
-                                      placeholder={isJp ? "ここにノートを書く..." : "Type your notes here..."}
-                                      className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100 min-h-[60px] resize-y"
-                                    />
+                                    <div className="mt-3 border-t border-sage-200/50 pt-3">
+                                      <span className="mb-1.5 block text-[10px] font-medium text-ink-muted">
+                                        {isJp ? "講義PDF" : "Lecture PDF"}
+                                      </span>
+                                      {lectureData.pdfName ? (
+                                        <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
+                                          <FileText className="h-4 w-4 text-red-400" />
+                                          <span className="flex-1 text-xs text-ink">{lectureData.pdfName}</span>
+                                          <button
+                                            onClick={() => updateLectureData(lectureId, { pdfName: null })}
+                                            className="text-ink-muted hover:text-red-400"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => updateLectureData(lectureId, { pdfName: "lecture_notes.pdf" })}
+                                          className="flex items-center gap-1.5 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs text-ink-muted hover:border-sage-400 hover:text-sage-600 transition-colors"
+                                        >
+                                          <FileText className="h-3 w-3" />
+                                          {isJp ? "PDFを添付" : "Attach Lecture PDF"}
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="mt-3 border-t border-sage-200/50 pt-3">
+                                      <span className="mb-1 block text-[10px] font-medium text-ink-muted">
+                                        {isJp ? "ノート" : "Quick Notes"}
+                                      </span>
+                                      <textarea
+                                        value={lectureData.note}
+                                        onChange={(e) => updateLectureData(lectureId, { note: e.target.value })}
+                                        placeholder={isJp ? "ここにノートを書く..." : "Type your notes here..."}
+                                        className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100 min-h-[60px] resize-y"
+                                      />
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
