@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Plus, Upload, Layers, X, FileUp } from "lucide-react";
+import { FileText, Plus, Upload, Layers, X, FileUp, HelpCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentNotes as initialNotes, type NoteItem } from "@/lib/data";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -9,52 +9,39 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 export default function NotesPage() {
   const { t } = useTranslation();
   const [notes, setNotes] = useLocalStorage<NoteItem[]>("studyspace_notes", initialNotes);
-  const [modalOpen, setModalOpen] = useState<null | "pdf" | "anki" | "note">(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
 
   const closeModal = () => {
-    setModalOpen(null);
+    setModalOpen(false);
     setNewTitle("");
     setNewBody("");
   };
 
-  const handleCreate = () => {
+  const handleCreate = (tag: string) => {
     if (!newTitle.trim()) return;
-    const tag = modalOpen === "pdf" ? "PDF" : modalOpen === "anki" ? "Anki" : "Note";
     const newNote: NoteItem = {
       id: Date.now(),
       title: newTitle.trim(),
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       tag,
-      excerpt: newBody.trim() || (modalOpen === "pdf" ? "PDF lecture notes (click to view)..." : "Anki card deck..."),
+      excerpt: newBody.trim() || (tag === "PDF" ? "PDF lecture notes (click to view)..." : tag === "Anki" ? "Anki card deck..." : "Quiz questions..."),
     };
     setNotes([newNote, ...notes]);
     closeModal();
   };
 
+  const toolButtons = [
+    { tag: "PDF", label: t("notes.importPdf"), icon: Upload, color: "bg-lavender-300 hover:bg-lavender-400" },
+    { tag: "Anki", label: t("notes.createAnki"), icon: Layers, color: "bg-lavender-300 hover:bg-lavender-400" },
+    { tag: "Quiz", label: "Quiz", icon: HelpCircle, color: "bg-lavender-300 hover:bg-lavender-400" },
+  ];
+
   return (
     <div className="page-enter">
       <h1 className="mb-1 text-3xl font-bold text-ink">{t("notes.title")}</h1>
       <p className="mb-6 text-sm text-ink-soft">{t("notes.subtitle")}</p>
-
-      {/* Action buttons (Import PDF + Create Anki remain at top) */}
-      <div className="mb-6 flex gap-3">
-        <button
-          onClick={() => setModalOpen("pdf")}
-          className="flex items-center gap-2 rounded-xl bg-lavender-300 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-lavender-400"
-        >
-          <Upload className="h-4 w-4" />
-          {t("notes.importPdf")}
-        </button>
-        <button
-          onClick={() => setModalOpen("anki")}
-          className="flex items-center gap-2 rounded-xl bg-lavender-300 px-5 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-lavender-400"
-        >
-          <Layers className="h-4 w-4" />
-          {t("notes.createAnki")}
-        </button>
-      </div>
 
       {/* Note cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -74,6 +61,8 @@ export default function NotesPage() {
                     ? "bg-red-50 text-red-500"
                     : note.tag === "Anki"
                     ? "bg-sage-50 text-sage-700"
+                    : note.tag === "Quiz"
+                    ? "bg-blue-50 text-blue-500"
                     : "bg-lavender-100 text-lavender-500"
                 }`}
               >
@@ -90,14 +79,14 @@ export default function NotesPage() {
 
       {/* Floating action button — bottom-right, plus icon only */}
       <button
-        onClick={() => setModalOpen("note")}
+        onClick={() => setModalOpen(true)}
         className="fixed bottom-8 right-8 flex h-14 w-14 items-center justify-center rounded-full bg-sage-500 text-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95 z-50"
         title="New Note"
       >
         <Plus className="h-6 w-6" />
       </button>
 
-      {/* Modal */}
+      {/* New Note modal with inline tool buttons */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
@@ -108,9 +97,7 @@ export default function NotesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">
-                {modalOpen === "pdf" ? t("notes.importPdf") : modalOpen === "anki" ? t("notes.createAnki") : "New Note"}
-              </h2>
+              <h2 className="text-lg font-semibold text-ink">New Note</h2>
               <button
                 onClick={closeModal}
                 className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100"
@@ -121,24 +108,19 @@ export default function NotesPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-ink-muted">
-                  {modalOpen === "anki" ? "Card title" : "Note title"}
-                </label>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">Note title</label>
                 <input
                   type="text"
                   autoFocus
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder={modalOpen === "pdf" ? "e.g., Lecture 5 — Graph Algorithms" : "e.g., Chapter 3 Review"}
+                  placeholder="e.g., Chapter 3 Review"
                   className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
                 />
               </div>
 
-              {/* Note body / content textarea */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-ink-muted">
-                  {modalOpen === "anki" ? "Card content" : "Note content"}
-                </label>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">Note content</label>
                 <textarea
                   value={newBody}
                   onChange={(e) => setNewBody(e.target.value)}
@@ -148,24 +130,44 @@ export default function NotesPage() {
                 />
               </div>
 
-              {modalOpen === "pdf" && (
-                <div className="rounded-xl border-2 border-dashed border-stone-300 p-6 text-center">
-                  <FileUp className="mx-auto mb-2 h-8 w-8 text-ink-muted" />
-                  <p className="text-xs text-ink-muted">
-                    Drop a PDF here or click to browse
-                  </p>
-                  <p className="mt-1 text-[10px] text-ink-muted/60">
-                    UI placeholder — file upload coming soon
-                  </p>
+              {/* Inline tool buttons — inside the note creation form */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-ink-muted">Create as</label>
+                <div className="flex gap-2">
+                  {toolButtons.map((tool) => {
+                    const Icon = tool.icon;
+                    return (
+                      <button
+                        key={tool.tag}
+                        onClick={() => handleCreate(tool.tag)}
+                        disabled={!newTitle.trim()}
+                        className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium text-white shadow-[var(--shadow-soft)] transition-colors disabled:opacity-50 ${tool.color}`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {tool.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+
+              {/* PDF upload placeholder (shown when user clicks Import PDF) */}
+              <div className="rounded-xl border-2 border-dashed border-stone-300 p-4 text-center">
+                <FileUp className="mx-auto mb-1 h-6 w-6 text-ink-muted" />
+                <p className="text-[11px] text-ink-muted">
+                  Click "Import Lecture PDF" to attach a PDF
+                </p>
+                <p className="mt-0.5 text-[10px] text-ink-muted/60">
+                  UI placeholder — file upload coming soon
+                </p>
+              </div>
 
               <button
-                onClick={handleCreate}
+                onClick={() => handleCreate("Note")}
                 disabled={!newTitle.trim()}
                 className="w-full rounded-xl bg-sage-500 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sage-600 disabled:opacity-50"
               >
-                {modalOpen === "pdf" ? "Import" : modalOpen === "anki" ? "Create" : "Create Note"}
+                Create Note
               </button>
             </div>
           </div>
