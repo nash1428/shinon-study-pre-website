@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Sparkles, ChevronLeft, ChevronRight, Clock, MapPin,
   FileText, X, ChevronDown, ChevronUp, Calendar, Loader2, Unlink,
@@ -8,67 +8,31 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/AuthContext";
 import { motivationalQuotes } from "@/lib/data";
-import { useGoogleCalendar, type GoogleCalendarEvent } from "@/hooks/useGoogleCalendar";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const currentDay = 22;
-const daysInMonth = 30;
-const firstDayOffset = 0;
-const deadlineDays = [5, 12, 18, 22, 25, 28];
+const monthsEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const monthsJp = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
 
-// Placeholder events (used when Google Calendar is not connected)
-const placeholderEvents: Record<number, { time: string; title: string; room: string }[]> = {
-  5: [{ time: "09:00 AM", title: "Data Structures", room: "Gates 100" }],
-  12: [{ time: "11:00 AM", title: "Macroeconomics", room: "Econ 220" }],
-  18: [{ time: "02:00 PM", title: "Linear Algebra", room: "Math 340" }],
-  22: [
+const dayLabelsEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const dayLabelsJp = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日"];
+
+// Placeholder events keyed by "year-month-day" (used when Google Calendar is not connected)
+const placeholderEvents: Record<string, { time: string; title: string; room: string }[]> = {
+  "2026-5-5": [{ time: "09:00 AM", title: "Data Structures", room: "Gates 100" }],
+  "2026-5-12": [{ time: "11:00 AM", title: "Macroeconomics", room: "Econ 220" }],
+  "2026-5-18": [{ time: "02:00 PM", title: "Linear Algebra", room: "Math 340" }],
+  "2026-5-22": [
     { time: "09:00 AM", title: "Data Structures", room: "Gates 100" },
     { time: "04:00 PM", title: "Japanese I", room: "Lang 112" },
   ],
-  25: [{ time: "11:00 AM", title: "Macroeconomics Midterm", room: "Econ 220" }],
-  28: [{ time: "02:00 PM", title: "Linear Algebra Quiz", room: "Math 340" }],
+  "2026-5-25": [{ time: "11:00 AM", title: "Macroeconomics Midterm", room: "Econ 220" }],
+  "2026-5-28": [{ time: "02:00 PM", title: "Linear Algebra Quiz", room: "Math 340" }],
 };
 
-const weekSchedule = [
-  {
-    day: "Monday",
-    dayJp: "月曜日",
-    events: [
-      { time: "09:00 AM - 10:30 AM", title: "Data Structures", room: "Gates 100", color: "sage" },
-      { time: "02:00 PM - 03:30 PM", title: "Linear Algebra", room: "Math 340", color: "sage" },
-    ],
-  },
-  {
-    day: "Tuesday",
-    dayJp: "火曜日",
-    events: [
-      { time: "11:00 AM - 12:30 PM", title: "Macroeconomics", room: "Econ 220", color: "lavender" },
-    ],
-  },
-  {
-    day: "Wednesday",
-    dayJp: "水曜日",
-    events: [
-      { time: "09:00 AM - 10:30 AM", title: "Data Structures — Lab", room: "Gates B1", color: "sage" },
-      { time: "04:00 PM - 05:30 PM", title: "Japanese I", room: "Lang 112", color: "lavender" },
-    ],
-  },
-  {
-    day: "Thursday",
-    dayJp: "木曜日",
-    events: [
-      { time: "11:00 AM - 12:30 PM", title: "Macroeconomics", room: "Econ 220", color: "lavender" },
-      { time: "02:00 PM - 03:30 PM", title: "Linear Algebra", room: "Math 340", color: "sage" },
-    ],
-  },
-  {
-    day: "Friday",
-    dayJp: "金曜日",
-    events: [
-      { time: "04:00 PM - 05:30 PM", title: "Japanese I — Oral Practice", room: "Lang 112", color: "lavender" },
-    ],
-  },
-];
+function dateKey(year: number, month: number, day: number) {
+  return `${year}-${month}-${day}`;
+}
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
@@ -78,32 +42,55 @@ export default function HomePage() {
   const greetingKey = hour < 12 ? "home.greeting.morning" : hour < 18 ? "home.greeting.afternoon" : "home.greeting.evening";
 
   const googleCal = useGoogleCalendar();
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  // Calendar navigation state — defaults to current month, range: ±1 year
+  const today = useMemo(() => new Date(), []);
+  const todayKey = useMemo(() => dateKey(today.getFullYear(), today.getMonth(), today.getDate()), [today]);
+  const minDate = useMemo(() => new Date(today.getFullYear() - 1, today.getMonth(), 1), [today]);
+  const maxDate = useMemo(() => new Date(today.getFullYear() + 1, today.getMonth(), 1), [today]);
+
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [expandedLecture, setExpandedLecture] = useState<string | null>(null);
   const [lectureNotes, setLectureNotes] = useState<Record<string, { pdfName: string | null; note: string }>>({});
 
-  // Merge Google Calendar events with placeholder events
-  const mergedEvents = useMemo(() => {
-    const merged: Record<number, { time: string; title: string; room: string }[]> = {};
+  // Fetch Google Calendar events when month changes
+  useEffect(() => {
+    if (googleCal.isConnected) {
+      googleCal.fetchForMonth(viewYear, viewMonth);
+    }
+  }, [viewYear, viewMonth, googleCal.isConnected, googleCal.fetchForMonth]);
 
-    // Add placeholder events (only if Google Calendar is not connected)
+  // Calendar math for the current view
+  const daysInMonth = useMemo(() => new Date(viewYear, viewMonth + 1, 0).getDate(), [viewYear, viewMonth]);
+  const firstDayOfMonth = useMemo(() => new Date(viewYear, viewMonth, 1).getDay(), [viewYear, viewMonth]);
+
+  const calendarCells: (number | null)[] = useMemo(() => {
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    return cells;
+  }, [firstDayOfMonth, daysInMonth]);
+
+  // Merge Google Calendar events with placeholder events (keyed by date string)
+  const mergedEvents = useMemo(() => {
+    const merged: Record<string, { time: string; title: string; room: string }[]> = {};
+
     if (!googleCal.isConnected) {
-      Object.entries(placeholderEvents).forEach(([day, events]) => {
-        const dayNum = parseInt(day);
-        if (!merged[dayNum]) merged[dayNum] = [];
-        merged[dayNum].push(...events);
+      Object.entries(placeholderEvents).forEach(([key, events]) => {
+        if (!merged[key]) merged[key] = [];
+        merged[key].push(...events);
       });
     }
 
-    // Add Google Calendar events
-    Object.entries(googleCal.eventsByDay).forEach(([day, events]) => {
-      const dayNum = parseInt(day);
-      if (!merged[dayNum]) merged[dayNum] = [];
+    Object.entries(googleCal.eventsByDate).forEach(([key, events]) => {
+      if (!merged[key]) merged[key] = [];
       events.forEach((event) => {
         const timeStr = event.start
           ? new Date(event.start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
           : "All day";
-        merged[dayNum].push({
+        merged[key].push({
           time: timeStr,
           title: event.title,
           room: event.location || "",
@@ -112,30 +99,47 @@ export default function HomePage() {
     });
 
     return merged;
-  }, [googleCal.isConnected, googleCal.eventsByDay]);
+  }, [googleCal.isConnected, googleCal.eventsByDate]);
 
-  const mergedDeadlineDays = useMemo(() => Object.keys(mergedEvents).map(Number), [mergedEvents]);
+  const hasEventOnDay = useCallback((day: number) => {
+    return !!mergedEvents[dateKey(viewYear, viewMonth, day)];
+  }, [mergedEvents, viewYear, viewMonth]);
 
-  // Compute the current week's Monday–Friday day numbers (synced with monthly calendar)
-  const weekDays = useMemo(() => {
-    const dow = (currentDay - 1) % 7; // 0=Sun, 1=Mon, ..., 6=Sat (June 1 is Sunday)
-    const monday = dow === 0 ? currentDay + 1 : currentDay - dow + 1;
-    return [
-      { day: monday, label: "Monday", labelJp: "月曜日" },
-      { day: monday + 1, label: "Tuesday", labelJp: "火曜日" },
-      { day: monday + 2, label: "Wednesday", labelJp: "水曜日" },
-      { day: monday + 3, label: "Thursday", labelJp: "木曜日" },
-      { day: monday + 4, label: "Friday", labelJp: "金曜日" },
-    ];
-  }, []);
+  // Month navigation with ±1 year clamping
+  const canGoPrev = useMemo(() => {
+    return viewYear > minDate.getFullYear() || (viewYear === minDate.getFullYear() && viewMonth > minDate.getMonth());
+  }, [viewYear, viewMonth, minDate]);
 
-  const calendarCells: (number | null)[] = [];
-  for (let i = 0; i < firstDayOffset; i++) calendarCells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) calendarCells.push(d);
+  const canGoNext = useMemo(() => {
+    return viewYear < maxDate.getFullYear() || (viewYear === maxDate.getFullYear() && viewMonth < maxDate.getMonth());
+  }, [viewYear, viewMonth, maxDate]);
+
+  const handlePrevMonth = () => {
+    if (!canGoPrev) return;
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(viewYear - 1);
+    } else {
+      setViewMonth(viewMonth - 1);
+    }
+    setSelectedDateKey(null);
+  };
+
+  const handleNextMonth = () => {
+    if (!canGoNext) return;
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(viewYear + 1);
+    } else {
+      setViewMonth(viewMonth + 1);
+    }
+    setSelectedDateKey(null);
+  };
 
   const handleDayClick = (day: number) => {
-    if (mergedDeadlineDays.includes(day)) {
-      setSelectedDay(selectedDay === day ? null : day);
+    const key = dateKey(viewYear, viewMonth, day);
+    if (mergedEvents[key]) {
+      setSelectedDateKey(selectedDateKey === key ? null : key);
     }
   };
 
@@ -149,6 +153,52 @@ export default function HomePage() {
       [lectureId]: { ...prev[lectureId], ...data },
     }));
   };
+
+  // Compute the week containing the selected day (or today if nothing selected)
+  const weekDays = useMemo(() => {
+    let refDay: number;
+    let refYear = viewYear;
+    let refMonth = viewMonth;
+
+    if (selectedDateKey) {
+      const parts = selectedDateKey.split("-");
+      refYear = parseInt(parts[0]);
+      refMonth = parseInt(parts[1]);
+      refDay = parseInt(parts[2]);
+    } else {
+      // Use today if it's in the current view month, otherwise use the 1st
+      if (today.getFullYear() === viewYear && today.getMonth() === viewMonth) {
+        refDay = today.getDate();
+      } else {
+        refDay = 1;
+      }
+    }
+
+    const refDate = new Date(refYear, refMonth, refDay);
+    const dow = refDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+
+    // Find Monday of this week
+    const monday = new Date(refYear, refMonth, refDay - (dow === 0 ? 6 : dow - 1));
+
+    const days = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      days.push({
+        day: d.getDate(),
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        key: dateKey(d.getFullYear(), d.getMonth(), d.getDate()),
+        label: dayLabelsEn[i],
+        labelJp: dayLabelsJp[i],
+      });
+    }
+    return days;
+  }, [selectedDateKey, viewYear, viewMonth, today]);
+
+  const monthLabel = isJp
+    ? `${viewYear}年${monthsJp[viewMonth]}`
+    : `${monthsEn[viewMonth]} ${viewYear}`;
 
   return (
     <div className="page-enter">
@@ -169,9 +219,8 @@ export default function HomePage() {
         <div className="lg:col-span-2">
           <div className="rounded-2xl bg-white p-6 shadow-[var(--shadow-card)]">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">{t("home.calendar.title")}</h2>
+              <h2 className="text-lg font-semibold text-ink">{monthLabel}</h2>
               <div className="flex items-center gap-2">
-                {/* Google Calendar connect/disconnect button */}
                 {googleCal.isConfigured && (
                   googleCal.isConnected ? (
                     <button
@@ -197,23 +246,29 @@ export default function HomePage() {
                     </button>
                   )
                 )}
-                <button className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100">
+                <button
+                  onClick={handlePrevMonth}
+                  disabled={!canGoPrev}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <button className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100">
+                <button
+                  onClick={handleNextMonth}
+                  disabled={!canGoNext}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            {/* Error message */}
             {googleCal.error && (
               <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-[11px] text-red-500">
                 {googleCal.error}
               </div>
             )}
 
-            {/* Connected status badge */}
             {googleCal.isConnected && (
               <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-sage-50 px-3 py-1.5 text-[11px] text-sage-700">
                 <Calendar className="h-3 w-3" />
@@ -233,18 +288,19 @@ export default function HomePage() {
 
             <div className="grid grid-cols-7 gap-1">
               {calendarCells.map((day, i) => {
-                const hasEvent = day !== null && mergedDeadlineDays.includes(day);
-                const isToday = day === currentDay;
-                const isSelected = day === selectedDay;
+                if (day === null) return <div key={i} />;
+                const key = dateKey(viewYear, viewMonth, day);
+                const dayEvents = mergedEvents[key];
+                const hasEvent = !!dayEvents;
+                const isToday = key === todayKey;
+                const isSelected = key === selectedDateKey;
                 return (
                   <button
                     key={i}
-                    onClick={() => day && handleDayClick(day)}
+                    onClick={() => handleDayClick(day)}
                     disabled={!hasEvent}
                     className={`relative flex aspect-square items-center justify-center rounded-lg text-sm transition-all ${
-                      day === null
-                        ? ""
-                        : isSelected
+                      isSelected
                         ? "bg-sage-500 font-bold text-white shadow-[var(--shadow-soft)]"
                         : isToday
                         ? "bg-sage-100 font-bold text-sage-700 ring-1 ring-sage-300"
@@ -263,21 +319,21 @@ export default function HomePage() {
             </div>
 
             {/* Selected day events popover */}
-            {selectedDay && mergedEvents[selectedDay] && (
+            {selectedDateKey && mergedEvents[selectedDateKey] && (
               <div className="mt-4 rounded-xl bg-sage-50 p-4 ring-1 ring-sage-200">
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-sage-700">
-                    June {selectedDay}
+                    {monthsEn[viewMonth]} {parseInt(selectedDateKey.split("-")[2])}
                   </h3>
                   <button
-                    onClick={() => setSelectedDay(null)}
+                    onClick={() => setSelectedDateKey(null)}
                     className="text-sage-400 hover:text-sage-600"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {mergedEvents[selectedDay].map((event, ei) => (
+                  {mergedEvents[selectedDateKey].map((event, ei) => (
                     <div key={ei} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
                       <div className="h-2 w-2 rounded-full bg-sage-400 shrink-0" />
                       <div className="flex-1">
@@ -314,27 +370,30 @@ export default function HomePage() {
 
               <div className="space-y-4">
                 {weekDays.map((dayInfo, idx) => {
-                  const dayEvents = mergedEvents[dayInfo.day] || [];
-                  const isDaySelected = selectedDay === dayInfo.day;
+                  const dayEvents = mergedEvents[dayInfo.key] || [];
+                  const isDaySelected = selectedDateKey === dayInfo.key;
+                  const isToday = dayInfo.key === todayKey;
 
                   return (
                     <div key={idx} className="flex gap-4">
                       <div className="flex w-[60px] flex-col items-end pt-0.5">
                         <button
-                          onClick={() => setSelectedDay(isDaySelected ? null : dayInfo.day)}
+                          onClick={() => setSelectedDateKey(isDaySelected ? null : dayInfo.key)}
                           className={`text-xs font-semibold transition-colors ${
                             isDaySelected ? "text-sage-600" : "text-ink hover:text-sage-500"
                           }`}
                         >
                           {isJp ? dayInfo.labelJp : dayInfo.label}
                         </button>
-                        <span className="text-[10px] text-ink-muted">Jun {dayInfo.day}</span>
+                        <span className="text-[10px] text-ink-muted">
+                          {isJp ? `${dayInfo.month + 1}月${dayInfo.day}日` : `${monthsEn[dayInfo.month].slice(0, 3)} ${dayInfo.day}`}
+                        </span>
                       </div>
 
                       <div className="relative flex w-[16px] shrink-0 justify-center pt-1.5">
                         <div className={`h-2.5 w-2.5 rounded-full border-2 border-white ${
                           dayEvents.length > 0 ? "bg-sage-400" : "bg-stone-300"
-                        } ${isDaySelected ? "ring-2 ring-sage-200" : ""}`} />
+                        } ${isDaySelected ? "ring-2 ring-sage-200" : ""} ${isToday ? "ring-2 ring-sage-300" : ""}`} />
                       </div>
 
                       <div className={`flex-1 space-y-2 pb-1 rounded-xl p-1.5 -m-1.5 transition-colors ${
@@ -344,17 +403,16 @@ export default function HomePage() {
                           <p className="py-1 text-xs text-ink-muted">{t("home.week.noEvents")}</p>
                         ) : (
                           dayEvents.map((event, ei) => {
-                            const lectureId = `day${dayInfo.day}-${ei}`;
+                            const lectureId = `${dayInfo.key}-${ei}`;
                             const isExpanded = expandedLecture === lectureId;
                             const lectureData = lectureNotes[lectureId] || { pdfName: null, note: "" };
 
                             return (
                               <div key={ei}>
-                                {/* Lecture card (clickable) */}
                                 <button
                                   onClick={() => {
                                     handleLectureClick(lectureId);
-                                    setSelectedDay(dayInfo.day);
+                                    setSelectedDateKey(dayInfo.key);
                                   }}
                                   className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-all ${
                                       isExpanded
@@ -376,7 +434,6 @@ export default function HomePage() {
                                   )}
                                 </button>
 
-                                {/* Expanded lecture section */}
                                 {isExpanded && (
                                   <div className="mt-1 rounded-xl bg-sage-50 p-4 ring-1 ring-sage-200">
                                     <div className="space-y-2">

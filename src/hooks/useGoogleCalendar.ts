@@ -18,12 +18,13 @@ export interface GoogleCalendarEvent {
 interface UseGoogleCalendarReturn {
   isConnected: boolean;
   events: GoogleCalendarEvent[];
-  eventsByDay: Record<number, GoogleCalendarEvent[]>;
+  eventsByDate: Record<string, GoogleCalendarEvent[]>;
   connect: () => void;
   disconnect: () => void;
   loading: boolean;
   error: string;
   isConfigured: boolean;
+  fetchForMonth: (year: number, month: number) => void;
 }
 
 export function useGoogleCalendar(): UseGoogleCalendarReturn {
@@ -36,12 +37,11 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
 
   const isConfigured = !GOOGLE_CLIENT_ID.includes("YOUR_CLIENT_ID");
 
-  // Fetch events using plain fetch
-  const fetchEvents = useCallback(async (accessToken: string): Promise<boolean> => {
+  // Fetch events for a specific month range
+  const fetchEventsForMonth = useCallback(async (accessToken: string, year: number, month: number): Promise<boolean> => {
     try {
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const startOfMonth = new Date(year, month, 1);
+      const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
 
       const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
         `timeMin=${encodeURIComponent(startOfMonth.toISOString())}` +
@@ -55,10 +55,7 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
-          // Token expired — caller should re-auth
-          return false;
-        }
+        if (res.status === 401) return false;
         throw new Error(`Calendar API returned ${res.status}`);
       }
 
@@ -74,9 +71,8 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       }));
 
       setEvents(mapped);
-      setError(""); // clear any previous error
+      setError("");
 
-      // Cache events in localStorage so they survive token expiry
       try {
         localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(mapped));
       } catch {}
@@ -89,7 +85,6 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     }
   }, []);
 
-  // Load Google Identity Services script
   const loadGoogleScript = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (typeof window === "undefined") return reject("Not in browser");
@@ -103,111 +98,85 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     });
   }, []);
 
-  // Initialize token client (used for both initial auth and silent re-auth)
   const ensureTokenClient = useCallback(async () => {
     await loadGoogleScript();
-
     if (!tokenClientRef.current) {
       tokenClientRef.current = (window as any).google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: CALENDAR_SCOPE,
-        callback: () => {}, // Will be overridden per-request
+        callback: () => {},
       });
     }
-
     return tokenClientRef.current;
   }, [loadGoogleScript]);
 
-  // Silently refresh token (no popup if already authorized)
   const refreshToken = useCallback(async (): Promise<string | null> => {
     try {
       const client = await ensureTokenClient();
-
       return new Promise<string | null>((resolve) => {
         client.callback = (response: any) => {
-          if (response.error) {
-            resolve(null);
-            return;
-          }
+          if (response.error) { resolve(null); return; }
           const token = response.access_token;
           tokenRef.current = token;
           localStorage.setItem(TOKEN_KEY, token);
           resolve(token);
         };
-
-        // prompt: "" means no popup if user already authorized
         client.requestAccessToken({ prompt: "" });
       });
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }, [ensureTokenClient]);
 
-  // On mount: try to restore session + cached events
   useEffect(() => {
-    // Load cached events immediately (shows something while checking token)
     try {
       const cached = localStorage.getItem(EVENTS_CACHE_KEY);
-      if (cached) {
-        setEvents(JSON.parse(cached));
-      }
+      if (cached) setEvents(JSON.parse(cached));
     } catch {}
 
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return;
 
-    // We have a token — set as connected and try to fetch
     tokenRef.current = token;
     setIsConnected(true);
 
+    const now = new Date();
     (async () => {
-      const success = await fetchEvents(token);
+      const success = await fetchEventsForMonth(token, now.getFullYear(), now.getMonth());
       if (!success) {
-        // Token expired — try silent refresh
         const newToken = await refreshToken();
-        if (newToken) {
-          await fetchEvents(newToken);
-        }
-        // If refresh fails too, keep cached events visible
+        if (newToken) await fetchEventsForMonth(newToken, now.getFullYear(), now.getMonth());
       }
     })();
-  }, [fetchEvents, refreshToken]);
+  }, [fetchEventsForMonth, refreshToken]);
 
-  // Initial connect (with popup)
   const connect = useCallback(async () => {
     setLoading(true);
     setError("");
-
     try {
       const client = await ensureTokenClient();
-
       client.callback = async (response: any) => {
         if (response.error) {
           setError(response.error_description || response.error || "Authorization failed");
           setLoading(false);
           return;
         }
-
         const token = response.access_token;
         tokenRef.current = token;
         localStorage.setItem(TOKEN_KEY, token);
         setIsConnected(true);
-        await fetchEvents(token);
+        const now = new Date();
+        await fetchEventsForMonth(token, now.getFullYear(), now.getMonth());
         setLoading(false);
       };
-
       client.requestAccessToken({ prompt: "consent" });
     } catch (err: any) {
       setError(err?.message || "Failed to connect to Google Calendar");
       setLoading(false);
     }
-  }, [ensureTokenClient, fetchEvents]);
+  }, [ensureTokenClient, fetchEventsForMonth]);
 
   const disconnect = useCallback(() => {
     const token = tokenRef.current;
-    if (token) {
-      fetch(`https://oauth2.googleapis.com/revoke?token=${token}`).catch(() => {});
-    }
+    if (token) fetch(`https://oauth2.googleapis.com/revoke?token=${token}`).catch(() => {});
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(EVENTS_CACHE_KEY);
     tokenRef.current = null;
@@ -215,24 +184,40 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     setEvents([]);
   }, []);
 
-  // Group events by day of month
-  const eventsByDay: Record<number, GoogleCalendarEvent[]> = {};
+  // Fetch events for a specific month (called when user navigates)
+  const fetchForMonth = useCallback((year: number, month: number) => {
+    if (!isConnected) return;
+    const token = tokenRef.current || localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+
+    (async () => {
+      const success = await fetchEventsForMonth(token, year, month);
+      if (!success) {
+        const newToken = await refreshToken();
+        if (newToken) await fetchEventsForMonth(newToken, year, month);
+      }
+    })();
+  }, [isConnected, fetchEventsForMonth, refreshToken]);
+
+  // Group events by date string (YYYY-MM-DD)
+  const eventsByDate: Record<string, GoogleCalendarEvent[]> = {};
   events.forEach((event) => {
     if (!event.start) return;
     const date = new Date(event.start);
-    const day = date.getDate();
-    if (!eventsByDay[day]) eventsByDay[day] = [];
-    eventsByDay[day].push(event);
+    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    if (!eventsByDate[key]) eventsByDate[key] = [];
+    eventsByDate[key].push(event);
   });
 
   return {
     isConnected,
     events,
-    eventsByDay,
+    eventsByDate,
     connect,
     disconnect,
     loading,
     error,
     isConfigured,
+    fetchForMonth,
   };
 }
