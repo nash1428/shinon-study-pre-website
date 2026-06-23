@@ -35,6 +35,7 @@ export default function LoginForm() {
         }
         await signup(email, password, name);
       }
+      // Redirect immediately — user is already set in context
       router.push("/");
     } catch (err: any) {
       // Map Firebase error codes to translated messages

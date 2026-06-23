@@ -25,11 +25,20 @@ function ProtectedApp() {
     }
   }, [loading, user, router]);
 
-  // Show loading spinner while checking auth state
-  if (loading || !user) {
+  // Show loading spinner only on initial auth check (not after login)
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-cream">
         <Loader2 className="h-6 w-6 animate-spin text-sage-500" />
+      </div>
+    );
+  }
+
+  // Redirect to /login if not authenticated
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-cream">
+        <p className="text-sm text-ink-muted">Redirecting to login…</p>
       </div>
     );
   }
