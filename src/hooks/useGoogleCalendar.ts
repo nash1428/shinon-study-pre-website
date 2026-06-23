@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
-// Google OAuth Client ID — replace with your own from Google Cloud Console
-// https://console.cloud.google.com/apis/credentials
 const GOOGLE_CLIENT_ID = "337419547217-io5ke2ja6149mad4e7n31csor5qeq1mu.apps.googleusercontent.com";
-const GOOGLE_API_KEY = "AIzaSyBU_9HhkdYu4Fw2mBdvXeh8e0CvkzJW8b0";
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 
 export interface GoogleCalendarEvent {
@@ -20,7 +17,7 @@ interface UseGoogleCalendarReturn {
   isConnected: boolean;
   events: GoogleCalendarEvent[];
   eventsByDay: Record<number, GoogleCalendarEvent[]>;
-  connect: () => Promise<void>;
+  connect: () => void;
   disconnect: () => void;
   loading: boolean;
   error: string;
@@ -32,123 +29,37 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const tokenRef = useRef<string | null>(null);
 
-  const isConfigured =
-    !GOOGLE_CLIENT_ID.includes("YOUR_CLIENT_ID") &&
-    !GOOGLE_API_KEY.includes("YOUR_API_KEY");
+  const isConfigured = !GOOGLE_CLIENT_ID.includes("YOUR_CLIENT_ID");
 
-  // Check for existing token on mount
-  useEffect(() => {
-    const token = localStorage.getItem("studyspace_google_token");
-    if (token) {
-      setIsConnected(true);
-    }
-  }, []);
-
-  // Load Google API script
-  const loadGoogleApi = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window === "undefined") return reject("Not in browser");
-      if ((window as any).google?.accounts?.oauth2) return resolve();
-
-      const script = document.createElement("script");
-      script.src = "https://accounts.google.com/gsi/client";
-      script.onload = () => resolve();
-      script.onerror = () => reject("Failed to load Google API");
-      document.head.appendChild(script);
-    });
-  };
-
-  // Load GAPI client for Calendar API
-  const loadGapiClient = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window === "undefined") return reject("Not in browser");
-      if ((window as any).gapi?.client?.calendar) return resolve();
-
-      const script = document.createElement("script");
-      script.src = "https://apis.google.com/js/api.js";
-      script.onload = () => {
-        const gapi = (window as any).gapi;
-        gapi.load("client", async () => {
-          try {
-            await gapi.client.init({
-              apiKey: GOOGLE_API_KEY,
-              discoveryDocs: [
-                "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
-              ],
-            });
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      };
-      script.onerror = () => reject("Failed to load GAPI");
-      document.head.appendChild(script);
-    });
-  };
-
-  const connect = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
+  // Fetch events using plain fetch (no GAPI library needed)
+  const fetchEvents = useCallback(async (accessToken: string) => {
     try {
-      await loadGoogleApi();
-      await loadGapiClient();
-
-      const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: CALENDAR_SCOPE,
-        callback: async (response: any) => {
-          if (response.error) {
-            setError(response.error);
-            setLoading(false);
-            return;
-          }
-
-          const token = response.access_token;
-          localStorage.setItem("studyspace_google_token", token);
-          setIsConnected(true);
-
-          // Fetch events
-          await fetchEvents(token);
-          setLoading(false);
-        },
-      });
-
-      tokenClient.requestAccessToken({ prompt: "consent" });
-    } catch (err: any) {
-      setError(err?.message || "Failed to connect to Google Calendar");
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchEvents = useCallback(async (token?: string) => {
-    const accessToken = token || localStorage.getItem("studyspace_google_token");
-    if (!accessToken) return;
-
-    try {
-      const gapi = (window as any).gapi;
-      if (!gapi?.client?.calendar) {
-        await loadGapiClient();
-      }
-
-      // Calculate current month range
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-      const response = await (window as any).gapi.client.calendar.events.list({
-        calendarId: "primary",
-        timeMin: startOfMonth.toISOString(),
-        timeMax: endOfMonth.toISOString(),
-        showDeleted: false,
-        singleEvents: true,
-        maxResults: 100,
-        orderBy: "startTime",
+      const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+        `timeMin=${encodeURIComponent(startOfMonth.toISOString())}` +
+        `&timeMax=${encodeURIComponent(endOfMonth.toISOString())}` +
+        `&singleEvents=true` +
+        `&maxResults=100` +
+        `&orderBy=startTime`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      const items = response.result.items || [];
+      if (!res.ok) {
+        const body = await res.text();
+        console.error("Calendar API error:", res.status, body);
+        throw new Error(`Calendar API returned ${res.status}`);
+      }
+
+      const data = await res.json();
+      const items = data.items || [];
+
       const mapped: GoogleCalendarEvent[] = items.map((item: any) => ({
         id: item.id,
         title: item.summary || "Untitled",
@@ -159,12 +70,76 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
 
       setEvents(mapped);
     } catch (err: any) {
+      console.error("Fetch events error:", err);
       setError(err?.message || "Failed to fetch calendar events");
     }
   }, []);
 
+  // Check for existing token on mount
+  useEffect(() => {
+    const token = localStorage.getItem("studyspace_google_token");
+    if (token) {
+      tokenRef.current = token;
+      setIsConnected(true);
+      fetchEvents(token);
+    }
+  }, [fetchEvents]);
+
+  // Load Google Identity Services script
+  const loadGoogleScript = useCallback((): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (typeof window === "undefined") return reject("Not in browser");
+      if ((window as any).google?.accounts?.oauth2) return resolve();
+
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.onload = () => resolve();
+      script.onerror = () => reject("Failed to load Google API script");
+      document.head.appendChild(script);
+    });
+  }, []);
+
+  const connect = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      await loadGoogleScript();
+
+      const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: CALENDAR_SCOPE,
+        callback: (response: any) => {
+          if (response.error) {
+            setError(response.error_description || response.error || "Authorization failed");
+            setLoading(false);
+            return;
+          }
+
+          const token = response.access_token;
+          tokenRef.current = token;
+          localStorage.setItem("studyspace_google_token", token);
+          setIsConnected(true);
+          fetchEvents(token);
+          setLoading(false);
+        },
+      });
+
+      tokenClient.requestAccessToken({ prompt: "consent" });
+    } catch (err: any) {
+      setError(err?.message || "Failed to connect to Google Calendar");
+      setLoading(false);
+    }
+  }, [loadGoogleScript, fetchEvents]);
+
   const disconnect = useCallback(() => {
+    const token = tokenRef.current;
+    if (token) {
+      // Revoke the token
+      fetch(`https://oauth2.googleapis.com/revoke?token=${token}`).catch(() => {});
+    }
     localStorage.removeItem("studyspace_google_token");
+    tokenRef.current = null;
     setIsConnected(false);
     setEvents([]);
   }, []);
