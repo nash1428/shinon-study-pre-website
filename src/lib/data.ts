@@ -45,6 +45,8 @@ export type NoteItem = {
   date: string;
   tag: string;
   excerpt: string;
+  fullContent?: string;
+  fullWidth?: boolean;
 };
 
 export const recentNotes: NoteItem[] = [
