@@ -39,7 +39,15 @@ export const todaySchedule = [
   },
 ];
 
-export const recentNotes = [
+export type NoteItem = {
+  id: number;
+  title: string;
+  date: string;
+  tag: string;
+  excerpt: string;
+};
+
+export const recentNotes: NoteItem[] = [
   {
     id: 1,
     title: "Graph Traversal Algorithms",
@@ -70,14 +78,20 @@ export const recentNotes = [
   },
 ];
 
-export const todayTasks = [
+export type TaskItem = {
+  id: number;
+  title: string;
+  done: boolean;
+};
+
+export const todayTasks: TaskItem[] = [
   { id: 1, title: "Review BFS/DFS lecture notes", done: false },
   { id: 2, title: "Submit Macro Problem Set 3", done: false },
   { id: 3, title: "Practice Japanese kanji — Lesson 8", done: true },
   { id: 4, title: "Watch Linear Algebra lecture 12", done: false },
 ];
 
-export const upcomingTasks = [
+export const upcomingTasks: TaskItem[] = [
   { id: 5, title: "Data Structures midterm prep", done: false },
   { id: 6, title: "Macro essay outline — due Fri", done: false },
   { id: 7, title: "Japanese oral presentation", done: false },

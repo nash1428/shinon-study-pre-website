@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Plus, Trash2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { todayTasks, upcomingTasks } from "@/lib/data";
+import { todayTasks, upcomingTasks, type TaskItem } from "@/lib/data";
 
 interface Task {
   id: number;
@@ -13,13 +13,37 @@ interface Task {
 
 export default function TasksPage() {
   const { t } = useTranslation();
-  const [today, setToday] = useState<Task[]>(todayTasks);
-  const [upcoming, setUpcoming] = useState<Task[]>(upcomingTasks);
+  const [today, setToday] = useState<Task[]>(todayTasks as Task[]);
+  const [upcoming, setUpcoming] = useState<Task[]>(upcomingTasks as Task[]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskList, setNewTaskList] = useState<"today" | "upcoming">("today");
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const toggleTask = (list: "today" | "upcoming", id: number) => {
     const setter = list === "today" ? setToday : setUpcoming;
     const current = list === "today" ? today : upcoming;
     setter(current.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  };
+
+  const handleAddTask = () => {
+    if (!newTaskTitle.trim()) return;
+    const newTask: Task = {
+      id: Date.now(),
+      title: newTaskTitle.trim(),
+      done: false,
+    };
+    if (newTaskList === "today") {
+      setToday([...today, newTask]);
+    } else {
+      setUpcoming([...upcoming, newTask]);
+    }
+    setNewTaskTitle("");
+    setShowAddForm(false);
+  };
+
+  const handleClearCompleted = () => {
+    setToday(today.filter((t) => !t.done));
+    setUpcoming(upcoming.filter((t) => !t.done));
   };
 
   const TaskItem = ({ task, list }: { task: Task; list: "today" | "upcoming" }) => (
@@ -49,24 +73,87 @@ export default function TasksPage() {
   );
 
   const todayCount = today.filter((t) => !t.done).length;
+  const completedCount = today.filter((t) => t.done).length + upcoming.filter((t) => t.done).length;
 
   return (
     <div className="page-enter">
-      <h1 className="text-3xl font-bold text-ink">{t("tasks.title")}</h1>
-      <p className="mb-6 text-sm text-ink-soft">
-        {todayCount} {t("tasks.remaining")}
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-ink">{t("tasks.title")}</h1>
+          <p className="text-sm text-ink-soft">
+            {todayCount} {t("tasks.remaining")}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="flex items-center gap-1.5 rounded-xl bg-sage-500 px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-sage-600"
+          >
+            <Plus className="h-4 w-4" />
+            Add Task
+          </button>
+          {completedCount > 0 && (
+            <button
+              onClick={handleClearCompleted}
+              className="flex items-center gap-1.5 rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-red-50 hover:text-red-500 hover:border-red-200"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear Completed ({completedCount})
+            </button>
+          )}
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Add task form */}
+      {showAddForm && (
+        <div className="mt-4 flex gap-2 rounded-2xl bg-white p-3 shadow-[var(--shadow-card)]">
+          <select
+            value={newTaskList}
+            onChange={(e) => setNewTaskList(e.target.value as "today" | "upcoming")}
+            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-ink-soft focus:outline-none"
+          >
+            <option value="today">{t("tasks.today")}</option>
+            <option value="upcoming">{t("tasks.upcoming")}</option>
+          </select>
+          <input
+            type="text"
+            autoFocus
+            value={newTaskTitle}
+            onChange={(e) => setNewTaskTitle(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
+            placeholder="Type a task title..."
+            className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+          />
+          <button
+            onClick={handleAddTask}
+            disabled={!newTaskTitle.trim()}
+            className="rounded-lg bg-sage-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sage-600 disabled:opacity-50"
+          >
+            Add
+          </button>
+          <button
+            onClick={() => { setShowAddForm(false); setNewTaskTitle(""); }}
+            className="rounded-lg px-2 text-ink-muted hover:bg-stone-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Today */}
         <div>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             {t("tasks.today")}
           </h2>
           <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
-            {today.map((task) => (
-              <TaskItem key={task.id} task={task} list="today" />
-            ))}
+            {today.length === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-muted">All done! 🎉</p>
+            ) : (
+              today.map((task) => (
+                <TaskItem key={task.id} task={task} list="today" />
+              ))
+            )}
           </div>
         </div>
 
@@ -76,9 +163,13 @@ export default function TasksPage() {
             {t("tasks.upcoming")}
           </h2>
           <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
-            {upcoming.map((task) => (
-              <TaskItem key={task.id} task={task} list="upcoming" />
-            ))}
+            {upcoming.length === 0 ? (
+              <p className="py-6 text-center text-sm text-ink-muted">Nothing upcoming.</p>
+            ) : (
+              upcoming.map((task) => (
+                <TaskItem key={task.id} task={task} list="upcoming" />
+              ))
+            )}
           </div>
         </div>
       </div>
