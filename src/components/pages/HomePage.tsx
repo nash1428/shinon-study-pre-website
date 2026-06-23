@@ -2,7 +2,8 @@
 
 import { Sparkles, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { userData, motivationalQuotes } from "@/lib/data";
+import { useAuth } from "@/lib/AuthContext";
+import { motivationalQuotes } from "@/lib/data";
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const currentDay = 22;
@@ -53,6 +54,7 @@ const weekSchedule = [
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
+  const { profile } = useAuth();
   const isJp = i18n.language === "jp";
   const hour = new Date().getHours();
   const greetingKey = hour < 12 ? "home.greeting.morning" : hour < 18 ? "home.greeting.afternoon" : "home.greeting.evening";
@@ -66,7 +68,7 @@ export default function HomePage() {
       {/* Greeting */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-ink">
-          {t(greetingKey)}, {userData.name}! 👋
+          {t(greetingKey)}, {profile?.name || "Student"}! 👋
         </h1>
         <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-soft">
           <Sparkles className="h-4 w-4 text-sage-500" />

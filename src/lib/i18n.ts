@@ -28,6 +28,28 @@ const resources = {
       "profile.changePhoto": "Change Photo",
       "profile.removePhoto": "Remove",
 
+      // Auth / Login
+      "auth.login": "Login",
+      "auth.signup": "Sign Up",
+      "auth.email": "Email",
+      "auth.password": "Password",
+      "auth.name": "Name",
+      "auth.loginButton": "Log In",
+      "auth.signupButton": "Sign Up",
+      "auth.noAccount": "Don't have an account?",
+      "auth.haveAccount": "Already have an account?",
+      "auth.welcome": "Welcome back",
+      "auth.createAccount": "Create your account",
+      "auth.subtitle": "Small steps every day.",
+      "auth.error": "An error occurred. Please try again.",
+      "auth.errorEmail": "Invalid email address.",
+      "auth.errorPassword": "Password should be at least 6 characters.",
+      "auth.errorUserNotFound": "No account found with this email.",
+      "auth.errorWrongPassword": "Incorrect password. Please try again.",
+      "auth.errorEmailInUse": "This email is already registered.",
+      "auth.demoMode": "Demo mode — any email/password will work.",
+      "auth.logout": "Log Out",
+
       // Language toggle
       "lang.toggle": "EN | JP",
 
@@ -94,6 +116,28 @@ const resources = {
       "profile.cancel": "キャンセル",
       "profile.changePhoto": "写真を変更",
       "profile.removePhoto": "削除",
+
+      // Auth / Login
+      "auth.login": "ログイン",
+      "auth.signup": "新規登録",
+      "auth.email": "メールアドレス",
+      "auth.password": "パスワード",
+      "auth.name": "名前",
+      "auth.loginButton": "ログイン",
+      "auth.signupButton": "登録",
+      "auth.noAccount": "アカウントをお持ちでないですか？",
+      "auth.haveAccount": "すでにアカウントをお持ちですか？",
+      "auth.welcome": "おかえりなさい",
+      "auth.createAccount": "アカウントを作成",
+      "auth.subtitle": "毎日少しずつ。",
+      "auth.error": "エラーが発生しました。もう一度お試しください。",
+      "auth.errorEmail": "メールアドレスが無効です。",
+      "auth.errorPassword": "パスワードは6文字以上で入力してください。",
+      "auth.errorUserNotFound": "このメールアドレスのアカウントが見つかりません。",
+      "auth.errorWrongPassword": "パスワードが正しくありません。もう一度お試しください。",
+      "auth.errorEmailInUse": "このメールアドレスはすでに登録されています。",
+      "auth.demoMode": "デモモード — どのメール/パスワードでもログインできます。",
+      "auth.logout": "ログアウト",
 
       // Language toggle
       "lang.toggle": "EN | JP",

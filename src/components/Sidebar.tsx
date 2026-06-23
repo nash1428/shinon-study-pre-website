@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Home, NotebookPen, ListChecks, Search, GraduationCap,
   ChevronUp, X, Check, Camera, Trash2,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, LogOut,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useAuth, type UserProfile } from "@/lib/AuthContext";
 
 export type TabId = "home" | "notes" | "tasks" | "search";
 
@@ -15,6 +16,7 @@ interface SidebarProps {
   onTabChange: (tab: TabId) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  profileData: UserProfile | null;
 }
 
 const navItems: { id: TabId; labelKey: string; icon: typeof Home }[] = [
@@ -24,33 +26,7 @@ const navItems: { id: TabId; labelKey: string; icon: typeof Home }[] = [
   { id: "search", labelKey: "sidebar.search", icon: Search },
 ];
 
-interface ProfileData {
-  name: string;
-  university: string;
-  semester: string;
-  degree: string;
-  major: string;
-  email: string;
-  hometown: string;
-  location: string;
-  isPrivate: boolean;
-  avatarUrl: string | null;
-}
-
-const defaultProfile: ProfileData = {
-  name: "Shinon",
-  university: "Stanford University",
-  semester: "Spring 2026 · Semester 4",
-  degree: "B.S. Computer Science",
-  major: "CS, Economics",
-  email: "shinon@example.edu",
-  hometown: "Tokyo, Japan",
-  location: "Stanford, CA",
-  isPrivate: false,
-  avatarUrl: null,
-};
-
-const profileFields: { key: keyof Omit<ProfileData, "isPrivate" | "avatarUrl">; labelKey: string }[] = [
+const profileFields: { key: keyof Omit<UserProfile, "isPrivate" | "avatarUrl">; labelKey: string }[] = [
   { key: "name", labelKey: "profile.name" },
   { key: "university", labelKey: "profile.university" },
   { key: "semester", labelKey: "profile.semester" },
@@ -61,15 +37,37 @@ const profileFields: { key: keyof Omit<ProfileData, "isPrivate" | "avatarUrl">; 
   { key: "location", labelKey: "profile.location" },
 ];
 
-export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleCollapse }: SidebarProps) {
+const defaultProfile: UserProfile = {
+  name: "Student",
+  university: "",
+  semester: "",
+  degree: "",
+  major: "",
+  email: "",
+  hometown: "",
+  location: "",
+  isPrivate: false,
+  avatarUrl: null,
+};
+
+export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleCollapse, profileData }: SidebarProps) {
   const { t } = useTranslation();
+  const { saveProfile, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>(defaultProfile);
-  const [draft, setDraft] = useState<ProfileData>(defaultProfile);
+  const [draft, setDraft] = useState<UserProfile>(profileData || defaultProfile);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSave = () => {
-    setProfile(draft);
+  // Sync profile data from auth context when it changes
+  useEffect(() => {
+    if (profileData) {
+      setDraft(profileData);
+    }
+  }, [profileData]);
+
+  const profile = profileData || defaultProfile;
+
+  const handleSave = async () => {
+    await saveProfile(draft);
     setIsExpanded(false);
   };
 
@@ -90,7 +88,6 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
     setDraft({ ...draft, avatarUrl: null });
   };
 
-  // When collapsed, clicking the avatar expands the whole sidebar
   const handleAvatarClickCollapsed = () => {
     onToggleCollapse();
   };
@@ -111,7 +108,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         className="flex items-center justify-center rounded-full bg-lavender-200 font-bold text-lavender-500"
         style={{ width: size, height: size, fontSize: size * 0.4 }}
       >
-        {name[0]}
+        {name?.[0] || "S"}
       </div>
     );
   };
@@ -122,7 +119,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         isCollapsed ? "w-16" : "w-64"
       }`}
     >
-      {/* Hidden file input for avatar upload */}
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -131,7 +128,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         className="hidden"
       />
 
-      {/* Header — logo + collapse toggle */}
+      {/* Header */}
       <div className={`flex items-center py-6 ${isCollapsed ? "justify-center px-2" : "gap-2.5 px-6"}`}>
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sage-500 shadow-[var(--shadow-soft)]">
           <GraduationCap className="h-5 w-5 text-white" strokeWidth={2.2} />
@@ -209,7 +206,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
       {/* Expandable Profile Section */}
       <div className="border-t border-stone-200/60">
         {isCollapsed ? (
-          /* Collapsed sidebar — just avatar, click to expand sidebar */
+          /* Collapsed sidebar — avatar only */
           <button
             onClick={handleAvatarClickCollapsed}
             className="flex w-full items-center justify-center py-4 transition-colors hover:bg-stone-200/30"
@@ -225,7 +222,6 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         ) : isExpanded ? (
           /* Expanded — editable form */
           <div className="max-h-[70vh] overflow-y-auto px-4 pb-4">
-            {/* Avatar uploader + close */}
             <div className="flex items-center gap-3 py-3">
               <div className="relative group/avatar">
                 <Avatar size={48} url={draft.avatarUrl} name={draft.name} />
@@ -259,7 +255,6 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
               </button>
             </div>
 
-            {/* Editable fields */}
             <div className="space-y-2.5">
               {profileFields.map((field) => (
                 <div key={field.key}>
@@ -268,7 +263,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
                   </label>
                   <input
                     type="text"
-                    value={draft[field.key]}
+                    value={draft[field.key] || ""}
                     onChange={(e) =>
                       setDraft({ ...draft, [field.key]: e.target.value })
                     }
@@ -297,7 +292,6 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
               </button>
             </div>
 
-            {/* Save / Cancel buttons */}
             <div className="mt-3 flex gap-2">
               <button
                 onClick={handleSave}
@@ -313,6 +307,15 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
                 {t("profile.cancel")}
               </button>
             </div>
+
+            {/* Logout button */}
+            <button
+              onClick={() => logout()}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-200 py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500"
+            >
+              <LogOut className="h-3 w-3" />
+              {t("auth.logout")}
+            </button>
           </div>
         ) : (
           /* Collapsed profile — avatar + name + chevron */
@@ -326,7 +329,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
             <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
             <div className="flex-1 min-w-0 text-left">
               <p className="truncate text-sm font-medium text-ink">{profile.name}</p>
-              <p className="truncate text-[11px] text-ink-muted">{profile.university}</p>
+              <p className="truncate text-[11px] text-ink-muted">{profile.university || profile.email}</p>
             </div>
             <ChevronUp className="h-4 w-4 text-ink-muted" />
           </button>
