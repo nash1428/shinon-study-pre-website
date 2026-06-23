@@ -311,7 +311,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
                 disabled={saveStatus === "saving"}
                 className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-colors ${
                   saveStatus === "saved"
-                    ? "bg-green-500"
+                    ? "bg-sage-500"
                     : saveStatus === "error"
                     ? "bg-red-400"
                     : "bg-sage-500 hover:bg-sage-600"
