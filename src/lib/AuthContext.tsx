@@ -202,24 +202,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const currentUser = auth?.currentUser;
 
+    // Always save to localStorage synchronously (instant, reliable)
+    try {
+      localStorage.setItem("studyspace_profile_backup", JSON.stringify(updatedProfile));
+    } catch {}
+
     if (currentUser) {
       profileCache.set(currentUser.uid, updatedProfile);
 
-      try {
-        localStorage.setItem("studyspace_profile_backup", JSON.stringify(updatedProfile));
-      } catch {}
-
+      // Fire Firestore write in background — DON'T await
+      // (avoids hanging on blocked Firestore security rules)
       if (db) {
-        try {
-          await setDoc(doc(db, "users", currentUser.uid), updatedProfile);
-        } catch (err) {
-          console.error("Firestore save failed, using localStorage backup:", err);
-        }
+        setDoc(doc(db, "users", currentUser.uid), updatedProfile).catch((err) => {
+          console.error("Firestore save failed (localStorage backup used):", err);
+        });
       }
-    } else {
-      try {
-        localStorage.setItem("studyspace_profile_backup", JSON.stringify(updatedProfile));
-      } catch {}
     }
   }, []);
 
