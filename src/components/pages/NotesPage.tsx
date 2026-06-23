@@ -2,11 +2,10 @@
 
 import { FileText, Plus, Upload, Layers } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useStudy } from "@/lib/StudyContext";
+import { recentNotes } from "@/lib/data";
 
 export default function NotesPage() {
   const { t } = useTranslation();
-  const { notes } = useStudy();
 
   return (
     <div className="page-enter">
@@ -27,12 +26,10 @@ export default function NotesPage() {
 
       {/* Note cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {notes.map((note) => (
+        {recentNotes.map((note) => (
           <div
             key={note.id}
-            className={`cursor-pointer rounded-2xl bg-white p-5 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-float)] ${
-              note.lectureId ? "ring-1 ring-sage-200" : ""
-            }`}
+            className="cursor-pointer rounded-2xl bg-white p-5 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-float)]"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -43,24 +40,15 @@ export default function NotesPage() {
                 className={`ml-3 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
                   note.tag === "PDF"
                     ? "bg-red-50 text-red-500"
-                    : note.tag === "Anki"
-                    ? "bg-sage-50 text-sage-700"
-                    : "bg-lavender-100 text-lavender-500"
+                    : "bg-sage-50 text-sage-700"
                 }`}
               >
                 {note.tag}
               </span>
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs text-ink-muted">
-                <FileText className="h-3 w-3" />
-                {note.date}
-              </div>
-              {note.lectureId && (
-                <span className="text-[10px] font-medium text-sage-600">
-                  {t("sidebar.home")} ←
-                </span>
-              )}
+            <div className="mt-4 flex items-center gap-1.5 text-xs text-ink-muted">
+              <FileText className="h-3 w-3" />
+              {note.date}
             </div>
           </div>
         ))}

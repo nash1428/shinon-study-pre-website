@@ -25,6 +25,8 @@ const resources = {
       "profile.private": "Private Account",
       "profile.save": "Save Changes",
       "profile.cancel": "Cancel",
+      "profile.changePhoto": "Change Photo",
+      "profile.removePhoto": "Remove",
 
       // Language toggle
       "lang.toggle": "EN | JP",
@@ -90,6 +92,8 @@ const resources = {
       "profile.private": "プライベートアカウント",
       "profile.save": "変更を保存",
       "profile.cancel": "キャンセル",
+      "profile.changePhoto": "写真を変更",
+      "profile.removePhoto": "削除",
 
       // Language toggle
       "lang.toggle": "EN | JP",

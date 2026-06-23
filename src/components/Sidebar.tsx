@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Home, NotebookPen, ListChecks, Search, GraduationCap, ChevronUp, ChevronDown, X, Check } from "lucide-react";
+import { useState, useRef } from "react";
+import {
+  Home, NotebookPen, ListChecks, Search, GraduationCap,
+  ChevronUp, X, Check, Camera, Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export type TabId = "home" | "notes" | "tasks" | "search";
@@ -28,6 +31,7 @@ interface ProfileData {
   hometown: string;
   location: string;
   isPrivate: boolean;
+  avatarUrl: string | null;
 }
 
 const defaultProfile: ProfileData = {
@@ -40,9 +44,10 @@ const defaultProfile: ProfileData = {
   hometown: "Tokyo, Japan",
   location: "Stanford, CA",
   isPrivate: false,
+  avatarUrl: null,
 };
 
-const profileFields: { key: keyof Omit<ProfileData, "isPrivate">; labelKey: string }[] = [
+const profileFields: { key: keyof Omit<ProfileData, "isPrivate" | "avatarUrl">; labelKey: string }[] = [
   { key: "name", labelKey: "profile.name" },
   { key: "university", labelKey: "profile.university" },
   { key: "semester", labelKey: "profile.semester" },
@@ -58,6 +63,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [profile, setProfile] = useState<ProfileData>(defaultProfile);
   const [draft, setDraft] = useState<ProfileData>(defaultProfile);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = () => {
     setProfile(draft);
@@ -69,8 +75,50 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     setIsExpanded(false);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setDraft({ ...draft, avatarUrl: url });
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setDraft({ ...draft, avatarUrl: null });
+  };
+
+  const Avatar = ({ size, url, name }: { size: number; url: string | null; name: string }) => {
+    if (url) {
+      return (
+        <img
+          src={url}
+          alt={name}
+          className="rounded-full object-cover"
+          style={{ width: size, height: size }}
+        />
+      );
+    }
+    return (
+      <div
+        className="flex items-center justify-center rounded-full bg-lavender-200 font-bold text-lavender-500"
+        style={{ width: size, height: size, fontSize: size * 0.4 }}
+      >
+        {name[0]}
+      </div>
+    );
+  };
+
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-stone-200/60 bg-cream">
+      {/* Hidden file input for avatar upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
       {/* Header — App title + logo */}
       <div className="flex items-center gap-2.5 px-6 py-6">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sage-500 shadow-[var(--shadow-soft)]">
@@ -122,11 +170,33 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         {isExpanded ? (
           /* Expanded — editable form */
           <div className="max-h-[70vh] overflow-y-auto px-4 pb-4">
-            {/* Header with close */}
-            <div className="flex items-center justify-between py-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                {t("profile.name")}
-              </span>
+            {/* Avatar uploader + close */}
+            <div className="flex items-center gap-3 py-3">
+              {/* Hover-overlay avatar */}
+              <div className="relative group/avatar">
+                <Avatar size={48} url={draft.avatarUrl} name={draft.name} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover/avatar:opacity-100"
+                  title={t("profile.changePhoto")}
+                >
+                  <Camera className="h-5 w-5 text-white" />
+                </button>
+              </div>
+              <div className="flex-1">
+                <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                  {t("profile.changePhoto")}
+                </span>
+                {draft.avatarUrl && (
+                  <button
+                    onClick={handleRemovePhoto}
+                    className="ml-2 flex items-center gap-1 text-[10px] text-red-400 hover:text-red-500"
+                  >
+                    <Trash2 className="h-2.5 w-2.5" />
+                    {t("profile.removePhoto")}
+                  </button>
+                )}
+              </div>
               <button
                 onClick={handleCancel}
                 className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-200/50"
@@ -199,9 +269,7 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
             }}
             className="flex w-full items-center gap-3 px-4 py-4 transition-colors hover:bg-stone-200/30"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-lavender-200 text-sm font-bold text-lavender-500">
-              {profile.name[0]}
-            </div>
+            <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
             <div className="flex-1 min-w-0 text-left">
               <p className="truncate text-sm font-medium text-ink">{profile.name}</p>
               <p className="truncate text-[11px] text-ink-muted">{profile.university}</p>
