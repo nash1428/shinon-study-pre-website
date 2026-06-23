@@ -7,6 +7,8 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  browserLocalPersistence,
+  setPersistence,
   type User as FirebaseUser,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -44,7 +46,6 @@ export function useAuth() {
   return ctx;
 }
 
-// Default profile used when a new user signs up
 const defaultProfile: UserProfile = {
   name: "",
   university: "",
@@ -58,129 +59,109 @@ const defaultProfile: UserProfile = {
   avatarUrl: null,
 };
 
-// Local storage fallback for when Firebase is not configured
-const LOCAL_USER_KEY = "studyspace_local_user";
-const LOCAL_PROFILE_KEY = "studyspace_local_profile";
+// In-memory cache so profile fetches don't block rendering
+const profileCache = new Map<string, UserProfile>();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isFirebaseConfigured) {
-      // Fallback: check localStorage for a mock session
-      const savedUser = localStorage.getItem(LOCAL_USER_KEY);
-      if (savedUser) {
-        try {
-          const parsed = JSON.parse(savedUser);
-          setUser(parsed);
-          const savedProfile = localStorage.getItem(LOCAL_PROFILE_KEY);
-          if (savedProfile) {
-            setProfile(JSON.parse(savedProfile));
-          } else {
-            setProfile({ ...defaultProfile, email: parsed.email, name: parsed.displayName || "" });
-          }
-        } catch {
-          // ignore parse errors
-        }
+  // Fetch profile from Firestore in the background (non-blocking)
+  const fetchProfileInBackground = useCallback(async (uid: string, fallback: Partial<UserProfile>) => {
+    // Return cached profile immediately if available
+    if (profileCache.has(uid)) {
+      setProfile(profileCache.get(uid)!);
+      return;
+    }
+
+    // Set a temporary profile from the auth user so UI renders instantly
+    const tempProfile = { ...defaultProfile, ...fallback } as UserProfile;
+    setProfile(tempProfile);
+
+    if (!db) return;
+
+    try {
+      const docRef = doc(db, "users", uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const fetched = docSnap.data() as UserProfile;
+        profileCache.set(uid, fetched);
+        setProfile(fetched);
+      } else {
+        // Create default profile for new users
+        const newProfile = { ...defaultProfile, ...fallback } as UserProfile;
+        await setDoc(docRef, newProfile);
+        profileCache.set(uid, newProfile);
+        setProfile(newProfile);
       }
+    } catch (err) {
+      // If Firestore fails, keep the temp profile — app still works
+      console.error("Profile fetch failed:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
       setLoading(false);
       return;
     }
 
-    // Real Firebase auth listener — persists across refreshes
-    const unsubscribe = onAuthStateChanged(auth!, async (firebaseUser) => {
+    // Ensure session persists locally for fast restore
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser && db) {
-        // Fetch profile from Firestore
-        const docRef = doc(db, "users", firebaseUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
-        } else {
-          // Create a default profile for new users
-          const newProfile: UserProfile = {
-            ...defaultProfile,
-            email: firebaseUser.email || "",
-            name: firebaseUser.displayName || "",
-          };
-          await setDoc(docRef, newProfile);
-          setProfile(newProfile);
-        }
+
+      if (firebaseUser) {
+        // Set loading=false immediately — don't wait for Firestore
+        setLoading(false);
+        // Fetch profile in background (non-blocking)
+        fetchProfileInBackground(firebaseUser.uid, {
+          email: firebaseUser.email || "",
+          name: firebaseUser.displayName || "",
+        });
       } else {
         setProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [fetchProfileInBackground]);
 
   const login = useCallback(async (email: string, password: string) => {
-    if (!isFirebaseConfigured) {
-      // Mock login — store in localStorage
-      const mockUser = {
-        uid: `local-${Date.now()}`,
-        email,
-        displayName: email.split("@")[0],
-      };
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(mockUser));
-      setUser(mockUser as any);
-      const newProfile = { ...defaultProfile, email, name: mockUser.displayName };
-      localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(newProfile));
-      setProfile(newProfile);
-      return;
-    }
-    await signInWithEmailAndPassword(auth!, email, password);
+    if (!isFirebaseConfigured || !auth) return;
+    // signInWithEmailAndPassword triggers onAuthStateChanged automatically
+    // which will set the user and fetch the profile
+    await signInWithEmailAndPassword(auth, email, password);
   }, []);
 
   const signup = useCallback(async (email: string, password: string, name: string) => {
-    if (!isFirebaseConfigured) {
-      // Mock signup
-      const mockUser = {
-        uid: `local-${Date.now()}`,
-        email,
-        displayName: name,
-      };
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(mockUser));
-      setUser(mockUser as any);
-      const newProfile = { ...defaultProfile, email, name };
-      localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(newProfile));
-      setProfile(newProfile);
-      return;
-    }
-    const cred = await createUserWithEmailAndPassword(auth!, email, password);
+    if (!isFirebaseConfigured || !auth) return;
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
     if (cred.user) {
       await updateProfile(cred.user, { displayName: name });
-      // Create Firestore profile
+      // Create Firestore profile immediately (non-blocking for the UI)
       if (db) {
-        const newProfile: UserProfile = {
-          ...defaultProfile,
-          email,
-          name,
-        };
+        const newProfile: UserProfile = { ...defaultProfile, email, name };
         await setDoc(doc(db, "users", cred.user.uid), newProfile);
+        profileCache.set(cred.user.uid, newProfile);
       }
     }
+    // onAuthStateChanged will fire and set loading=false
   }, []);
 
   const logout = useCallback(async () => {
-    if (!isFirebaseConfigured) {
-      localStorage.removeItem(LOCAL_USER_KEY);
-      localStorage.removeItem(LOCAL_PROFILE_KEY);
-      setUser(null);
-      setProfile(null);
-      return;
-    }
-    await signOut(auth!);
+    if (!isFirebaseConfigured || !auth) return;
+    profileCache.clear();
+    await signOut(auth);
   }, []);
 
   const saveProfile = useCallback(async (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
-    if (!isFirebaseConfigured) {
-      localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(updatedProfile));
-      return;
+    if (user) {
+      profileCache.set(user.uid, updatedProfile);
     }
     if (user && db) {
       await setDoc(doc(db, "users", user.uid), updatedProfile);
