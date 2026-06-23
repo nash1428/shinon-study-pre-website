@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Home, NotebookPen, ListChecks, Search, GraduationCap,
+  Home, NotebookPen, ListChecks, Search,
   ChevronUp, X, Check, Camera, Trash2,
   PanelLeftClose, PanelLeftOpen, LogOut,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth, type UserProfile } from "@/lib/AuthContext";
+import Logo from "./Logo";
 
 export type TabId = "home" | "notes" | "tasks" | "search";
 
@@ -136,8 +137,8 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
 
       {/* Header */}
       <div className={`flex items-center py-6 ${isCollapsed ? "justify-center px-2" : "gap-2.5 px-6"}`}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sage-500 shadow-[var(--shadow-soft)]">
-          <GraduationCap className="h-5 w-5 text-white" strokeWidth={2.2} />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cream-dark shadow-[var(--shadow-soft)]">
+          <Logo className="h-7 w-7" />
         </div>
         {!isCollapsed && (
           <div className="flex-1 overflow-hidden">

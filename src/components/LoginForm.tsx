@@ -5,6 +5,7 @@ import { GraduationCap, Mail, Lock, User, AlertCircle, Loader2 } from "lucide-re
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
+import Logo from "./Logo";
 
 export default function LoginForm() {
   const { t } = useTranslation();
@@ -54,8 +55,8 @@ export default function LoginForm() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sage-500 shadow-[var(--shadow-card)]">
-            <GraduationCap className="h-7 w-7 text-white" strokeWidth={2.2} />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cream-dark shadow-[var(--shadow-card)]">
+            <Logo className="h-10 w-10" />
           </div>
           <div className="text-center">
             <h1 className="text-xl font-bold text-ink">StudySpace</h1>
