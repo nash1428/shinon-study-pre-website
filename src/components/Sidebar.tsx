@@ -92,8 +92,13 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setDraft({ ...draft, avatarUrl: url });
+      // Convert to base64 data URL so it survives page refresh
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        setDraft({ ...draft, avatarUrl: dataUrl });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
