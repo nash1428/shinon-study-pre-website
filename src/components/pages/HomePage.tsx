@@ -141,23 +141,15 @@ export default function HomePage() {
 
   return (
     <div className="page-enter space-y-6">
-      {/* Garden Hero — Kitsune + Garden Scene */}
-      <div className="relative overflow-hidden rounded-2xl bg-white/60 shadow-[var(--shadow-card)] border border-ivory-deep/40">
-        <GardenScene stage={gardenStage} className="w-full h-[200px]" />
-        <div className="absolute top-4 left-6">
-          <div className="flex items-center gap-3">
-            <Kitsune className="h-12 w-12 drop-shadow-sm" expression="calm" />
-            <div>
-              <h1 className="font-serif text-2xl font-semibold text-ink">
-                {t(greetingKey)}, {profile?.name || "Student"}
-              </h1>
-              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-muted">
-                <Sparkles className="h-3 w-3 text-gold" />
-                {t("home.quote")}
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* Greeting */}
+      <div>
+        <h1 className="font-serif text-3xl font-bold text-ink">
+          {t(greetingKey)}, {profile?.name || "Student"}
+        </h1>
+        <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-muted">
+          <Sparkles className="h-3.5 w-3.5 text-gold" />
+          {t("home.quote")}
+        </p>
       </div>
 
       {/* Three-column: AI Modes + Focus Timer + Check-in */}
