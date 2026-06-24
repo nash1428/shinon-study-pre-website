@@ -1,41 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  /* Soft off-white / cream background */
-  --color-cream: #FAFAF9;
-  --color-cream-dark: #F5F5F4;
+  /* Kitsune Sensei Color System */
+  --color-moss: #7D8F69;
+  --color-moss-light: #9CAE8B;
+  --color-moss-dark: #6B7D5A;
 
-  /* Warm dark gray text */
-  --color-ink: #3F3F46;
-  --color-ink-soft: #71717A;
-  --color-ink-muted: #A1A1AA;
+  --color-ivory: #F5F0E6;
+  --color-ivory-warm: #EDE6D8;
+  --color-ivory-deep: #E5DCC8;
 
-  /* Sage green — primary accent */
-  --color-sage-50: #F0F4ED;
-  --color-sage-100: #E8EFE5;
-  --color-sage-200: #D1DFC9;
-  --color-sage-300: #B3CFAB;
-  --color-sage-400: #95BD8B;
-  --color-sage-500: #8FA782;
-  --color-sage-600: #7C9971;
-  --color-sage-700: #6B8762;
-  --color-sage-800: #5A7353;
+  --color-stone: #8A8D84;
+  --color-stone-light: #A8ABA2;
+  --color-stone-dark: #6E716A;
 
-  /* Dusty lavender — secondary accent */
-  --color-lavender-50: #F5F2F8;
-  --color-lavender-100: #EDE9F2;
-  --color-lavender-200: #DDD4E5;
-  --color-lavender-300: #B8A9C9;
-  --color-lavender-400: #A89BBA;
-  --color-lavender-500: #9385A8;
+  --color-gold: #C9A86A;
+  --color-gold-light: #D9BE8A;
+  --color-gold-dark: #B89456;
 
-  /* Soft shadows */
-  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.03);
-  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --color-ink: #2E2B26;
+  --color-ink-soft: #4A4740;
+  --color-ink-muted: #8A857A;
 
-  /* Font */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-bamboo: #8FA37C;
+  --color-maple: #B98A62;
+
+  --shadow-soft: 0 1px 3px rgba(46, 43, 38, 0.04), 0 1px 2px rgba(46, 43, 38, 0.03);
+  --shadow-card: 0 2px 8px rgba(46, 43, 38, 0.05), 0 1px 3px rgba(46, 43, 38, 0.03);
+  --shadow-float: 0 4px 16px rgba(46, 43, 38, 0.08), 0 2px 6px rgba(46, 43, 38, 0.04);
+  --shadow-glow: 0 0 20px rgba(201, 168, 106, 0.15);
+
+  --font-serif: "Cormorant Garamond", "Noto Serif JP", serif;
+  --font-sans: "Inter", "Noto Sans JP", -apple-system, sans-serif;
 }
 
 * {
@@ -44,35 +40,69 @@
 }
 
 body {
-  background-color: var(--color-cream);
+  background-color: var(--color-ivory);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
 
-/* Custom scrollbar — soft and subtle */
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #E7E5E4;
-  border-radius: 4px;
+h1, h2, h3, .font-serif {
+  font-family: var(--font-serif);
 }
 
-/* Smooth page transitions */
-.page-enter {
-  animation: fadeIn 0.25s ease-out;
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D5CCBE; border-radius: 4px; }
+
+::selection { background-color: rgba(125, 143, 105, 0.2); }
+
+[contenteditable]:focus { outline: none; }
+
+/* Garden animations */
+@keyframes ripple {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes leaf-fall {
+  0% { transform: translateY(-10px) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.7; }
+  100% { transform: translateY(300px) rotate(360deg); opacity: 0; }
 }
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-1deg); }
+  50% { transform: rotate(1deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; filter: blur(8px); }
+  50% { opacity: 0.8; filter: blur(12px); }
+}
+
+@keyframes koi-swim {
+  0% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(30px) translateY(-5px); }
+  50% { transform: translateX(15px) translateY(5px); }
+  75% { transform: translateX(-10px) translateY(-3px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+
+@keyframes mist-drift {
+  0% { transform: translateX(0); opacity: 0.15; }
+  50% { opacity: 0.25; }
+  100% { transform: translateX(40px); opacity: 0.15; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter { animation: fade-in 0.3s ease-out; }
+.animate-ripple { animation: ripple 3s ease-out infinite; }
+.animate-leaf { animation: leaf-fall 8s linear infinite; }
+.animate-sway { animation: sway 4s ease-in-out infinite; }
+.animate-glow { animation: glow-pulse 4s ease-in-out infinite; }
+.animate-koi { animation: koi-swim 6s ease-in-out infinite; }
+.animate-mist { animation: mist-drift 12s ease-in-out infinite; }

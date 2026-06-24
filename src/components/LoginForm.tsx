@@ -52,11 +52,11 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-cream px-4">
+    <div className="flex min-h-screen items-center justify-center bg-ivory px-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cream-dark shadow-[var(--shadow-card)]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ivory-dark shadow-[var(--shadow-card)]">
             <Logo className="h-10 w-10" />
           </div>
           <div className="text-center">
@@ -68,12 +68,12 @@ export default function LoginForm() {
         {/* Card */}
         <div className="rounded-2xl bg-white p-7 shadow-[var(--shadow-card)]">
           {/* Mode toggle */}
-          <div className="mb-5 flex rounded-xl bg-stone-100 p-1">
+          <div className="mb-5 flex rounded-xl bg-ivory-warm p-1">
             <button
               onClick={() => { setMode("login"); setError(""); }}
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
                 mode === "login"
-                  ? "bg-white text-sage-700 shadow-[var(--shadow-soft)]"
+                  ? "bg-white text-moss shadow-[var(--shadow-soft)]"
                   : "text-ink-muted hover:text-ink"
               }`}
             >
@@ -83,7 +83,7 @@ export default function LoginForm() {
               onClick={() => { setMode("signup"); setError(""); }}
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
                 mode === "signup"
-                  ? "bg-white text-sage-700 shadow-[var(--shadow-soft)]"
+                  ? "bg-white text-moss shadow-[var(--shadow-soft)]"
                   : "text-ink-muted hover:text-ink"
               }`}
             >
@@ -100,39 +100,39 @@ export default function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {mode === "signup" && (
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+                <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t("auth.name")}
                   required
-                  className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                  className="w-full rounded-xl border border-ivory-deep bg-white py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
                 />
               </div>
             )}
 
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("auth.email")}
                 required
-                className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                className="w-full rounded-xl border border-ivory-deep bg-white py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
               />
             </div>
 
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("auth.password")}
                 required
-                className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                className="w-full rounded-xl border border-ivory-deep bg-white py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
               />
             </div>
 
@@ -148,7 +148,7 @@ export default function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-sage-500 py-3 text-sm font-medium text-white transition-colors hover:bg-sage-600 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-moss py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -168,7 +168,7 @@ export default function LoginForm() {
                 setMode(mode === "login" ? "signup" : "login");
                 setError("");
               }}
-              className="font-medium text-sage-600 hover:text-sage-700"
+              className="font-medium text-sage-600 hover:text-moss"
             >
               {mode === "login" ? t("auth.signup") : t("auth.login")}
             </button>

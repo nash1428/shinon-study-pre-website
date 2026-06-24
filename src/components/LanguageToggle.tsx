@@ -18,9 +18,9 @@ export default function LanguageToggle() {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink-soft shadow-[var(--shadow-soft)] transition-colors hover:border-sage-300 hover:bg-sage-50"
+        className="flex items-center gap-2 rounded-full border border-ivory-deep bg-white px-3.5 py-1.5 text-xs font-medium text-ink-soft shadow-[var(--shadow-soft)] transition-colors hover:border-sage-300 hover:bg-sage-50"
       >
-        <Globe className="h-3.5 w-3.5 text-sage-500" />
+        <Globe className="h-3.5 w-3.5 text-moss" />
         <span>{currentLang === "jp" ? "JP" : "EN"}</span>
       </button>
 
@@ -37,12 +37,12 @@ export default function LanguageToggle() {
                 }}
                 className={`flex w-full items-center justify-between px-4 py-2 text-sm transition-colors ${
                   currentLang === lang.code
-                    ? "bg-sage-50 font-medium text-sage-700"
+                    ? "bg-sage-50 font-medium text-moss"
                     : "text-ink-soft hover:bg-stone-50"
                 }`}
               >
                 {lang.label}
-                {currentLang === lang.code && <Check className="h-3.5 w-3.5 text-sage-500" strokeWidth={2.5} />}
+                {currentLang === lang.code && <Check className="h-3.5 w-3.5 text-moss" strokeWidth={2.5} />}
               </button>
             ))}
           </div>

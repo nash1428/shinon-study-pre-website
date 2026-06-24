@@ -13,8 +13,8 @@ export default function SearchPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const categories = [
-    { key: "search.cat.notes", rawValue: "Notes", color: "bg-sage-50 text-sage-700", activeColor: "bg-sage-500 text-white", count: "24" },
-    { key: "search.cat.tasks", rawValue: "Tasks", color: "bg-lavender-50 text-lavender-500", activeColor: "bg-lavender-400 text-white", count: "7" },
+    { key: "search.cat.notes", rawValue: "Notes", color: "bg-moss/5 text-moss", activeColor: "bg-moss text-white", count: "24" },
+    { key: "search.cat.tasks", rawValue: "Tasks", color: "bg-gold/5 text-gold-dark", activeColor: "bg-gold/40 text-white", count: "7" },
     { key: "search.cat.schedule", rawValue: "Schedule", color: "bg-blue-50 text-blue-500", activeColor: "bg-blue-500 text-white", count: "4" },
     { key: "search.cat.anki", rawValue: "Anki Decks", color: "bg-amber-50 text-amber-600", activeColor: "bg-amber-500 text-white", count: "12" },
   ];
@@ -45,7 +45,7 @@ export default function SearchPage() {
 
       {/* Search bar */}
       <div className="relative mb-3">
-        <Search className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-stone-400" />
+        <Search className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-muted" />
         <input
           type="text"
           value={query}
@@ -54,12 +54,12 @@ export default function SearchPage() {
             setActiveCategory(null);
           }}
           placeholder={t("search.placeholder")}
-          className="w-full rounded-2xl border border-stone-200 bg-white py-3.5 pl-12 pr-4 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-4 focus:ring-sage-100"
+          className="w-full rounded-2xl border border-ivory-deep bg-white py-3.5 pl-12 pr-4 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-4 focus:ring-moss/10"
         />
         {query && (
           <button
             onClick={() => { setQuery(""); setActiveCategory(null); }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-muted hover:text-stone-600"
           >
             <X className="h-4 w-4" />
           </button>
@@ -69,7 +69,7 @@ export default function SearchPage() {
 
       {/* Live search results hint */}
       {query && (
-        <div className="mb-6 rounded-xl bg-sage-50 px-4 py-3 text-sm text-sage-700">
+        <div className="mb-6 rounded-xl bg-moss/5 px-4 py-3 text-sm text-moss">
           Searching for: <span className="font-semibold">"{query}"</span>
         </div>
       )}
@@ -90,8 +90,8 @@ export default function SearchPage() {
                   onClick={() => handleRecentClick(item)}
                   className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium shadow-[var(--shadow-soft)] transition-all duration-200 ${
                     query === item
-                      ? "bg-sage-500 text-white"
-                      : "bg-white text-ink-soft hover:bg-sage-50 hover:text-sage-700"
+                      ? "bg-moss text-white"
+                      : "bg-white text-ink-soft hover:bg-moss/5 hover:text-moss"
                   }`}
                 >
                   {item}

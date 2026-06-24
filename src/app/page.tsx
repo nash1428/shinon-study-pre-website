@@ -69,7 +69,7 @@ function ProtectedApp() {
       <main className={`min-h-screen transition-all duration-300 ${
         sidebarCollapsed ? "ml-16" : "ml-64"
       }`}>
-        <header className="sticky top-0 z-30 flex items-center justify-end border-b border-stone-200/60 bg-cream/90 px-10 py-3 backdrop-blur-lg">
+        <header className="sticky top-0 z-30 flex items-center justify-end border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
           <LanguageToggle />
         </header>
 

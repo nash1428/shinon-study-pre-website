@@ -37,9 +37,9 @@ export default function NotesPage() {
   };
 
   const toolButtons = [
-    { tag: "PDF", label: t("notes.importPdf"), icon: Upload, color: "bg-lavender-300 hover:bg-lavender-400" },
-    { tag: "Anki", label: t("notes.createAnki"), icon: Layers, color: "bg-lavender-300 hover:bg-lavender-400" },
-    { tag: "Quiz", label: "Quiz", icon: HelpCircle, color: "bg-lavender-300 hover:bg-lavender-400" },
+    { tag: "PDF", label: t("notes.importPdf"), icon: Upload, color: "bg-gold/30 hover:bg-gold/40" },
+    { tag: "Anki", label: t("notes.createAnki"), icon: Layers, color: "bg-gold/30 hover:bg-gold/40" },
+    { tag: "Quiz", label: "Quiz", icon: HelpCircle, color: "bg-gold/30 hover:bg-gold/40" },
   ];
 
   return (
@@ -63,7 +63,7 @@ export default function NotesPage() {
               </div>
               <div className="ml-3 flex items-center gap-1.5">
                 {note.fullWidth && (
-                  <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[9px] font-medium text-ink-muted">
+                  <span className="rounded-full bg-ivory-warm px-1.5 py-0.5 text-[9px] font-medium text-ink-muted">
                     Wide
                   </span>
                 )}
@@ -72,10 +72,10 @@ export default function NotesPage() {
                     note.tag === "PDF"
                       ? "bg-red-50 text-red-500"
                       : note.tag === "Anki"
-                      ? "bg-sage-50 text-sage-700"
+                      ? "bg-moss/5 text-moss"
                       : note.tag === "Quiz"
                       ? "bg-blue-50 text-blue-500"
-                      : "bg-lavender-100 text-lavender-500"
+                      : "bg-gold/10 text-gold-dark"
                   }`}
                 >
                   {note.tag}
@@ -93,7 +93,7 @@ export default function NotesPage() {
       {/* Floating action button — bottom-right, plus icon only */}
       <button
         onClick={() => setModalOpen(true)}
-        className="fixed bottom-8 right-8 flex h-14 w-14 items-center justify-center rounded-full bg-sage-500 text-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95 z-50"
+        className="fixed bottom-8 right-8 flex h-14 w-14 items-center justify-center rounded-full bg-moss text-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95 z-50"
         title="New Note"
       >
         <Plus className="h-6 w-6" />
@@ -119,8 +119,8 @@ export default function NotesPage() {
                   onClick={() => setFullWidth(!fullWidth)}
                   className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
                     fullWidth
-                      ? "border-sage-300 bg-sage-50 text-sage-700"
-                      : "border-stone-200 text-ink-muted hover:bg-stone-50"
+                      ? "border-sage-300 bg-moss/5 text-moss"
+                      : "border-ivory-deep text-ink-muted hover:bg-ivory-warm/50"
                   }`}
                   title={fullWidth ? "Full width" : "Standard width"}
                 >
@@ -129,7 +129,7 @@ export default function NotesPage() {
                 </button>
                 <button
                   onClick={closeModal}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-100"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -145,7 +145,7 @@ export default function NotesPage() {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="e.g., Chapter 3 Review"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-base text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                  className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-base text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
                 />
               </div>
 
@@ -156,7 +156,7 @@ export default function NotesPage() {
                   onChange={(e) => setNewBody(e.target.value)}
                   placeholder="Type your note content here..."
                   rows={6}
-                  className={`w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100 resize-y ${
+                  className={`w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10 resize-y ${
                     fullWidth ? "min-h-[200px]" : "min-h-[140px]"
                   }`}
                 />
@@ -184,7 +184,7 @@ export default function NotesPage() {
               </div>
 
               {/* PDF upload placeholder */}
-              <div className="rounded-xl border-2 border-dashed border-stone-300 p-4 text-center">
+              <div className="rounded-xl border-2 border-dashed border-ivory-deep p-4 text-center">
                 <FileUp className="mx-auto mb-1 h-6 w-6 text-ink-muted" />
                 <p className="text-[11px] text-ink-muted">
                   Click "Import Lecture PDF" to attach a PDF
@@ -197,7 +197,7 @@ export default function NotesPage() {
               <button
                 onClick={() => handleCreate("Note")}
                 disabled={!newTitle.trim()}
-                className="w-full rounded-xl bg-sage-500 py-3 text-sm font-medium text-white transition-colors hover:bg-sage-600 disabled:opacity-50"
+                className="w-full rounded-xl bg-moss py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
               >
                 Create Note
               </button>

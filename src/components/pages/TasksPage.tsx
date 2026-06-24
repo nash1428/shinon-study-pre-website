@@ -57,8 +57,8 @@ export default function TasksPage() {
         onClick={() => toggleTask(list, task.id)}
         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-200 ${
           task.done
-            ? "border-sage-500 bg-sage-500"
-            : "border-stone-300 bg-white hover:border-sage-400"
+            ? "border-sage-500 bg-moss"
+            : "border-ivory-deep bg-white hover:border-sage-400"
         }`}
       >
         {task.done && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
@@ -88,7 +88,7 @@ export default function TasksPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-1.5 rounded-xl bg-sage-500 px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-sage-600"
+            className="flex items-center gap-1.5 rounded-xl bg-moss px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-moss-dark"
           >
             <Plus className="h-4 w-4" />
             Add Task
@@ -96,7 +96,7 @@ export default function TasksPage() {
           {completedCount > 0 && (
             <button
               onClick={handleClearCompleted}
-              className="flex items-center gap-1.5 rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-red-50 hover:text-red-500 hover:border-red-200"
+              className="flex items-center gap-1.5 rounded-xl border border-ivory-deep px-4 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-red-50 hover:text-red-500 hover:border-red-200"
             >
               <Trash2 className="h-3.5 w-3.5" />
               Clear Completed ({completedCount})
@@ -111,7 +111,7 @@ export default function TasksPage() {
           <select
             value={newTaskList}
             onChange={(e) => setNewTaskList(e.target.value as "today" | "upcoming")}
-            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-ink-soft focus:outline-none"
+            className="rounded-lg border border-ivory-deep bg-white px-3 py-2 text-xs text-ink-soft focus:outline-none"
           >
             <option value="today">{t("tasks.today")}</option>
             <option value="upcoming">{t("tasks.upcoming")}</option>
@@ -123,18 +123,18 @@ export default function TasksPage() {
             onChange={(e) => setNewTaskTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
             placeholder="Type a task title..."
-            className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-ink placeholder:text-stone-400 focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+            className="flex-1 rounded-lg border border-ivory-deep bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
           />
           <button
             onClick={handleAddTask}
             disabled={!newTaskTitle.trim()}
-            className="rounded-lg bg-sage-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sage-600 disabled:opacity-50"
+            className="rounded-lg bg-moss px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
           >
             Add
           </button>
           <button
             onClick={() => { setShowAddForm(false); setNewTaskTitle(""); }}
-            className="rounded-lg px-2 text-ink-muted hover:bg-stone-100"
+            className="rounded-lg px-2 text-ink-muted hover:bg-ivory-warm"
           >
             <X className="h-4 w-4" />
           </button>

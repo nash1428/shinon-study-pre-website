@@ -118,7 +118,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
     }
     return (
       <div
-        className="flex items-center justify-center rounded-full bg-lavender-200 font-bold text-lavender-500"
+        className="flex items-center justify-center rounded-full bg-gold/20 font-bold text-gold-dark"
         style={{ width: size, height: size, fontSize: size * 0.4 }}
       >
         {name?.[0] || "S"}
@@ -128,7 +128,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-stone-200/60 bg-cream transition-all duration-300 ${
+      className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-ivory-deep/60 bg-ivory transition-all duration-300 ${
         isCollapsed ? "w-16" : "w-64"
       }`}
     >
@@ -143,19 +143,19 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
 
       {/* Header */}
       <div className={`flex items-center py-6 ${isCollapsed ? "justify-center px-2" : "gap-2.5 px-6"}`}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cream-dark shadow-[var(--shadow-soft)]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ivory-dark shadow-[var(--shadow-soft)]">
           <Logo className="h-7 w-7" />
         </div>
         {!isCollapsed && (
           <div className="flex-1 overflow-hidden">
-            <h1 className="text-base font-bold text-ink tracking-tight">{t("app.title")}</h1>
-            <p className="text-[10px] text-ink-muted">{t("app.tagline")}</p>
+            <h1 className="text-base font-bold text-ink tracking-tight">Kitsune Sensei</h1>
+            <p className="text-[10px] text-ink-muted">The garden grows with you</p>
           </div>
         )}
         {!isCollapsed && (
           <button
             onClick={onToggleCollapse}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-200/50 transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm/50 transition-colors"
             title="Collapse"
           >
             <PanelLeftClose className="h-4 w-4" />
@@ -168,7 +168,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         <div className="px-2">
           <button
             onClick={onToggleCollapse}
-            className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-200/50 transition-colors"
+            className="mx-auto flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm/50 transition-colors"
             title="Expand"
           >
             <PanelLeftOpen className="h-4 w-4" />
@@ -196,19 +196,19 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
                   isCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
                 } text-sm font-medium ${
                   isActive
-                    ? "bg-sage-100 text-sage-700"
-                    : "text-ink-soft hover:bg-stone-200/40 hover:text-ink"
+                    ? "bg-moss/10 text-moss"
+                    : "text-ink-soft hover:bg-ivory-warm/50 hover:text-ink"
                 }`}
               >
                 <Icon
                   className={`h-[18px] w-[18px] shrink-0 transition-colors duration-200 ${
-                    isActive ? "text-sage-600" : "text-ink-muted"
+                    isActive ? "text-moss" : "text-ink-muted"
                   }`}
                   strokeWidth={isActive ? 2.4 : 2}
                 />
                 {!isCollapsed && t(item.labelKey)}
                 {!isCollapsed && isActive && (
-                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-sage-500" />
+                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-moss" />
                 )}
               </button>
             );
@@ -217,12 +217,12 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
       </nav>
 
       {/* Expandable Profile Section */}
-      <div className="border-t border-stone-200/60">
+      <div className="border-t border-ivory-deep/60">
         {isCollapsed ? (
           /* Collapsed sidebar — avatar only */
           <button
             onClick={handleAvatarClickCollapsed}
-            className="flex w-full items-center justify-center py-4 transition-colors hover:bg-stone-200/30"
+            className="flex w-full items-center justify-center py-4 transition-colors hover:bg-ivory-warm/30"
             title={profile.name}
           >
             <div className="relative group/avatar">
@@ -262,7 +262,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
               </div>
               <button
                 onClick={handleCancel}
-                className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:bg-stone-200/50"
+                className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm/50"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -280,21 +280,21 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
                     onChange={(e) =>
                       setDraft({ ...draft, [field.key]: e.target.value })
                     }
-                    className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-ink focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                    className="w-full rounded-lg border border-ivory-deep bg-white px-3 py-2 text-xs text-ink focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
                   />
                 </div>
               ))}
             </div>
 
             {/* Privacy toggle */}
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-stone-50 px-3 py-2.5">
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-ivory-warm/50 px-3 py-2.5">
               <span className="text-xs font-medium text-ink-soft">
                 {t("profile.private")}
               </span>
               <button
                 onClick={() => setDraft({ ...draft, isPrivate: !draft.isPrivate })}
                 className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
-                  draft.isPrivate ? "bg-sage-500" : "bg-stone-300"
+                  draft.isPrivate ? "bg-moss" : "bg-stone-light"
                 }`}
               >
                 <div
@@ -311,10 +311,10 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
                 disabled={saveStatus === "saving"}
                 className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-colors ${
                   saveStatus === "saved"
-                    ? "bg-sage-500"
+                    ? "bg-moss"
                     : saveStatus === "error"
                     ? "bg-red-400"
-                    : "bg-sage-500 hover:bg-sage-600"
+                    : "bg-moss hover:bg-moss-dark"
                 } disabled:opacity-50`}
               >
                 {saveStatus === "saving" && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -323,7 +323,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
               </button>
               <button
                 onClick={handleCancel}
-                className="rounded-lg border border-stone-200 px-3 py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-stone-50"
+                className="rounded-lg border border-ivory-deep px-3 py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-ivory-warm/50"
               >
                 {t("profile.cancel")}
               </button>
@@ -332,7 +332,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
             {/* Logout button */}
             <button
               onClick={() => logout()}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-200 py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500"
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-ivory-deep py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500"
             >
               <LogOut className="h-3 w-3" />
               {t("auth.logout")}
@@ -345,7 +345,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
               setDraft(profile);
               setIsExpanded(true);
             }}
-            className="flex w-full items-center gap-3 px-4 py-4 transition-colors hover:bg-stone-200/30"
+            className="flex w-full items-center gap-3 px-4 py-4 transition-colors hover:bg-ivory-warm/30"
           >
             <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
             <div className="flex-1 min-w-0 text-left">
