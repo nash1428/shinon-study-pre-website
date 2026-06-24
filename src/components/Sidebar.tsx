@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth, type UserProfile } from "@/lib/AuthContext";
-import Logo from "./Logo";
+import FoxMark from "./FoxMark";
 
 export type TabId = "home" | "notes" | "tasks" | "search";
 
@@ -146,11 +146,15 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         className="hidden"
       />
 
-      {/* Header */}
+      {/* Header — Fox mark (clickable, navigates to Home) */}
       <div className={`flex items-center py-6 ${isCollapsed ? "justify-center px-2" : "gap-2.5 px-6"}`}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ivory-dark shadow-[var(--shadow-soft)]">
-          <Logo className="h-7 w-7" />
-        </div>
+        <button
+          onClick={() => onTabChange("home")}
+          className="shrink-0 cursor-pointer transition-transform hover:scale-105"
+          title="Home"
+        >
+          <FoxMark size={40} />
+        </button>
         {!isCollapsed && (
           <div className="flex-1 overflow-hidden">
             <h1 className="text-base font-bold text-ink tracking-tight">Study Garden</h1>
