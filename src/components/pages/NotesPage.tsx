@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Plus, Upload, Layers, X, FileUp, HelpCircle, AlignJustify, Columns2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentNotes as initialNotes, type NoteItem } from "@/lib/data";
@@ -13,6 +13,13 @@ export default function NotesPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
   const [fullWidth, setFullWidth] = useState(false);
+
+  // Listen for external "new note" trigger from header button
+  useEffect(() => {
+    const handler = () => setModalOpen(true);
+    window.addEventListener("studyspace-new-note", handler);
+    return () => window.removeEventListener("studyspace-new-note", handler);
+  }, []);
 
   const closeModal = () => {
     setModalOpen(false);
@@ -89,15 +96,6 @@ export default function NotesPage() {
           </div>
         ))}
       </div>
-
-      {/* Floating action button — bottom-right, plus icon only */}
-      <button
-        onClick={() => setModalOpen(true)}
-        className="fixed bottom-8 right-8 flex h-14 w-14 items-center justify-center rounded-full bg-moss text-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95 z-50"
-        title="New Note"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
 
       {/* New Note modal — larger, with full-width toggle */}
       {modalOpen && (

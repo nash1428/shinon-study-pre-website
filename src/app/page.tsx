@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import "@/lib/i18n";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import Sidebar, { type TabId } from "@/components/Sidebar";
 import LanguageToggle from "@/components/LanguageToggle";
+import FloatingChatbot from "@/components/FloatingChatbot";
 import HomePage from "@/components/pages/HomePage";
 import NotesPage from "@/components/pages/NotesPage";
 import TasksPage from "@/components/pages/TasksPage";
@@ -18,30 +19,33 @@ function ProtectedApp() {
   const [activeTab, setActiveTab] = useState<TabId>("home");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Redirect to /login if not authenticated
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
     }
   }, [loading, user, router]);
 
-  // Show loading spinner only on initial auth check (not after login)
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-cream">
-        <Loader2 className="h-6 w-6 animate-spin text-sage-500" />
+      <div className="flex min-h-screen items-center justify-center bg-ivory">
+        <Loader2 className="h-6 w-6 animate-spin text-moss" />
       </div>
     );
   }
 
-  // Redirect to /login if not authenticated
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-cream">
+      <div className="flex min-h-screen items-center justify-center bg-ivory">
         <p className="text-sm text-ink-muted">Redirecting to login…</p>
       </div>
     );
   }
+
+  const handleNewNote = () => {
+    setActiveTab("notes");
+    // Dispatch event that NotesPage listens for
+    setTimeout(() => window.dispatchEvent(new Event("studyspace-new-note")), 100);
+  };
 
   const renderPage = () => {
     switch (activeTab) {
@@ -57,7 +61,7 @@ function ProtectedApp() {
   };
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-ivory">
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -69,7 +73,18 @@ function ProtectedApp() {
       <main className={`min-h-screen transition-all duration-300 ${
         sidebarCollapsed ? "ml-16" : "ml-64"
       }`}>
-        <header className="sticky top-0 z-30 flex items-center justify-end border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
+        {/* Top header bar: New Note button (left) + Language toggle (right) */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
+          {/* New Note button — near top-left, next to page content area */}
+          <button
+            onClick={handleNewNote}
+            className="flex items-center gap-1.5 rounded-xl bg-moss px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-moss-dark"
+          >
+            <Plus className="h-4 w-4" />
+            New Note
+          </button>
+
+          {/* Language toggle — top-right */}
           <LanguageToggle />
         </header>
 
@@ -77,6 +92,9 @@ function ProtectedApp() {
           {renderPage()}
         </div>
       </main>
+
+      {/* Floating chatbot — always at bottom-right */}
+      <FloatingChatbot />
     </div>
   );
 }
