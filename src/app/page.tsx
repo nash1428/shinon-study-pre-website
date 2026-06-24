@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import "@/lib/i18n";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Sidebar, { type TabId } from "@/components/Sidebar";
 import LanguageToggle from "@/components/LanguageToggle";
 import FloatingChatbot from "@/components/FloatingChatbot";
@@ -41,12 +41,6 @@ function ProtectedApp() {
     );
   }
 
-  const handleNewNote = () => {
-    setActiveTab("notes");
-    // Dispatch event that NotesPage listens for
-    setTimeout(() => window.dispatchEvent(new Event("studyspace-new-note")), 100);
-  };
-
   const renderPage = () => {
     switch (activeTab) {
       case "home":
@@ -73,18 +67,8 @@ function ProtectedApp() {
       <main className={`min-h-screen transition-all duration-300 ${
         sidebarCollapsed ? "ml-16" : "ml-64"
       }`}>
-        {/* Top header bar: New Note button (left) + Language toggle (right) */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
-          {/* New Note button — near top-left, next to page content area */}
-          <button
-            onClick={handleNewNote}
-            className="flex items-center gap-1.5 rounded-xl bg-moss px-4 py-2 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-moss-dark"
-          >
-            <Plus className="h-4 w-4" />
-            New Note
-          </button>
-
-          {/* Language toggle — top-right */}
+        {/* Top header bar: Language toggle (right) */}
+        <header className="sticky top-0 z-30 flex items-center justify-end border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
           <LanguageToggle />
         </header>
 

@@ -12,7 +12,6 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import Kitsune from "@/components/Kitsune";
 import GardenScene from "@/components/GardenScene";
 import FocusTimer from "@/components/FocusTimer";
-import AIStudyModes from "@/components/AIStudyModes";
 import DailyCheckIn from "@/components/DailyCheckIn";
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -152,9 +151,8 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Three-column: AI Modes + Focus Timer + Check-in */}
+      {/* Three-column: Focus Timer + Check-in */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <AIStudyModes />
         <FocusTimer />
         <DailyCheckIn />
       </div>

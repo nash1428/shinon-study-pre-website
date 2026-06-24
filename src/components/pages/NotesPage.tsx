@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FileText, Plus, Upload, Layers, X, FileUp, HelpCircle, AlignJustify, Columns2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentNotes as initialNotes, type NoteItem } from "@/lib/data";
@@ -13,13 +13,6 @@ export default function NotesPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
   const [fullWidth, setFullWidth] = useState(false);
-
-  // Listen for external "new note" trigger from header button
-  useEffect(() => {
-    const handler = () => setModalOpen(true);
-    window.addEventListener("studyspace-new-note", handler);
-    return () => window.removeEventListener("studyspace-new-note", handler);
-  }, []);
 
   const closeModal = () => {
     setModalOpen(false);
@@ -51,8 +44,19 @@ export default function NotesPage() {
 
   return (
     <div className="page-enter">
-      <h1 className="mb-1 text-3xl font-bold text-ink">{t("notes.title")}</h1>
-      <p className="mb-6 text-sm text-ink-soft">{t("notes.subtitle")}</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-ink">{t("notes.title")}</h1>
+          <p className="mt-1 text-sm text-ink-soft">{t("notes.subtitle")}</p>
+        </div>
+        <button
+          onClick={() => setModalOpen(true)}
+          className="flex items-center gap-1.5 rounded-xl bg-moss px-4 py-2.5 text-sm font-medium text-white shadow-[var(--shadow-soft)] transition-colors hover:bg-moss-dark"
+        >
+          <Plus className="h-4 w-4" />
+          New Note
+        </button>
+      </div>
 
       {/* Note cards — full-width notes span the entire row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
