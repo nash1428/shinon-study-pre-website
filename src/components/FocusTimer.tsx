@@ -177,7 +177,7 @@ export default function FocusTimer() {
           <p className="font-serif text-sm italic text-ink-soft">
             "{kitsuneMessage}"
           </p>
-          <p className="mt-1 text-[10px] text-ink-muted">— Kitsune Sensei</p>
+          <p className="mt-1 text-[10px] text-ink-muted">— Study Garden</p>
         </div>
       )}
 

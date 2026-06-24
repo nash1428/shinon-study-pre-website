@@ -75,7 +75,7 @@ export default function DailyCheckIn() {
           <p className="font-serif text-sm italic text-ink-soft">
             "The garden has been tended today."
           </p>
-          <p className="mt-1 text-[10px] text-ink-muted">— Kitsune Sensei</p>
+          <p className="mt-1 text-[10px] text-ink-muted">— Study Garden</p>
           {checkIns.length > 1 && (
             <p className="mt-2 text-[11px] text-ink-muted">
               {checkIns.length} reflections recorded

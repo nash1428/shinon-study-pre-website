@@ -148,7 +148,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         </div>
         {!isCollapsed && (
           <div className="flex-1 overflow-hidden">
-            <h1 className="text-base font-bold text-ink tracking-tight">Kitsune Sensei</h1>
+            <h1 className="text-base font-bold text-ink tracking-tight">Study Garden</h1>
             <p className="text-[10px] text-ink-muted">The garden grows with you</p>
           </div>
         )}

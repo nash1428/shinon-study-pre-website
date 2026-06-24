@@ -5,7 +5,7 @@ const resources = {
   en: {
     translation: {
       // Sidebar
-      "app.title": "StudySpace",
+      "app.title": "Study Garden",
       "app.tagline": "Small steps every day",
       "sidebar.menu": "Menu",
       "sidebar.home": "Home",
@@ -94,7 +94,7 @@ const resources = {
   jp: {
     translation: {
       // Sidebar
-      "app.title": "StudySpace",
+      "app.title": "Study Garden",
       "app.tagline": "毎日少しずつ",
       "sidebar.menu": "メニュー",
       "sidebar.home": "ホーム",

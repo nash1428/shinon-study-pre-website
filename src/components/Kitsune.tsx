@@ -26,7 +26,7 @@ export default function Kitsune({ className, expression = "calm" }: KitsuneProps
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      aria-label="Kitsune Sensei"
+      aria-label="Study Garden"
     >
       <defs>
         <linearGradient id="kitsune-fur" x1="0%" y1="0%" x2="0%" y2="100%">

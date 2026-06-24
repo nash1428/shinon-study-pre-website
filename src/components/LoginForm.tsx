@@ -60,7 +60,7 @@ export default function LoginForm() {
             <Logo className="h-10 w-10" />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-ink">StudySpace</h1>
+            <h1 className="text-xl font-bold text-ink">Study Garden</h1>
             <p className="text-xs text-ink-muted">{t("auth.subtitle")}</p>
           </div>
         </div>

@@ -78,7 +78,7 @@ export default function AIStudyModes() {
       <div className="flex items-center gap-3 mb-4">
         <Kitsune className="h-10 w-10" expression={kitsuneExpression} />
         <div>
-          <h3 className="font-serif text-lg font-semibold text-ink">Kitsune Sensei</h3>
+          <h3 className="font-serif text-lg font-semibold text-ink">Study Garden</h3>
           <p className="text-[11px] text-ink-muted">Your AI study companion</p>
         </div>
       </div>
@@ -120,7 +120,7 @@ export default function AIStudyModes() {
                   }`}
                 >
                   {msg.role === "kitsune" && (
-                    <span className="mb-0.5 block font-serif text-[10px] italic text-gold">Kitsune Sensei</span>
+                    <span className="mb-0.5 block font-serif text-[10px] italic text-gold">Study Garden</span>
                   )}
                   {msg.text}
                 </div>
@@ -135,7 +135,7 @@ export default function AIStudyModes() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Ask Kitsune Sensei..."
+              placeholder="Ask Study Garden..."
               className="flex-1 rounded-xl border border-ivory-deep bg-white px-3.5 py-2 text-xs text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
             />
             <button
