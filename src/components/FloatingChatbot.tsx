@@ -54,7 +54,7 @@ export default function FloatingChatbot() {
           <div className="flex items-center justify-between border-b border-ivory-deep/40 px-4 py-3">
             <div className="flex items-center gap-2">
               <MessageCircle className="h-4 w-4 text-moss" />
-              <span className="font-serif text-sm font-semibold text-ink">Study Garden</span>
+              <span className="font-serif text-sm font-semibold text-ink">Fox Sensei</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -79,7 +79,7 @@ export default function FloatingChatbot() {
                   }`}
                 >
                   {msg.role === "bot" && (
-                    <span className="mb-0.5 block font-serif text-[10px] italic text-gold">Study Garden</span>
+                    <span className="mb-0.5 block font-serif text-[10px] italic text-gold">Fox Sensei</span>
                   )}
                   {msg.text}
                 </div>
@@ -114,7 +114,7 @@ export default function FloatingChatbot() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-moss text-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95"
-        title="Chat with Study Garden"
+        title="Chat with Fox Sensei"
       >
         <MessageCircle className="h-6 w-6" />
       </button>
