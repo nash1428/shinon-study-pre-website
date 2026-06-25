@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-// Module-level user registry (persists while the Node process is running)
-// This is a fallback when Firestore is not available
+// Module-level user registry (fallback when Firestore is not available)
 interface RegisteredUser {
   id: string;
   name: string;
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     const userId = authUser.localId;
     const email = authUser.email || "";
 
-    // Register or update the user in the in-memory store
+    // Build the user entry
     const existing = userRegistry.get(userId);
     const userEntry: RegisteredUser = {
       id: userId,
@@ -65,7 +66,33 @@ export async function POST(req: NextRequest) {
       registeredAt: existing?.registeredAt || new Date().toISOString(),
     };
 
+    // Save to in-memory registry
     userRegistry.set(userId, userEntry);
+
+    // Also save to Firestore (now that the database exists)
+    if (db) {
+      try {
+        // Check if user already exists in Firestore (preserve relationship arrays)
+        const existingDoc = await getDoc(doc(db, "users", userId));
+        const existingData = existingDoc.exists() ? existingDoc.data() : {};
+
+        await setDoc(doc(db, "users", userId), {
+          id: userId,
+          name: userEntry.name,
+          email: userEntry.email,
+          university: userEntry.university,
+          avatarUrl: userEntry.avatarUrl,
+          isPrivate: userEntry.isPrivate,
+          followers: existingData.followers || userEntry.followers,
+          following: existingData.following || userEntry.following,
+          friends: existingData.friends || userEntry.friends,
+          friendRequests: existingData.friendRequests || userEntry.friendRequests,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (err) {
+        console.warn("[register-user] Firestore write failed, using in-memory only:", err);
+      }
+    }
 
     return NextResponse.json({ ok: true, user: { id: userId, name: userEntry.name } });
   } catch (err) {
