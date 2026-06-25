@@ -18,18 +18,38 @@ function isToday(dateStr?: string) {
   return d.toDateString() === today.toDateString();
 }
 
-function isUpcoming(dateStr?: string) {
+function isOverdue(dateStr?: string) {
   if (!dateStr) return false;
   const d = new Date(dateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return d > today;
+  return d < today;
+}
+
+function isWithinNext7Days(dateStr?: string) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  d.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const in7Days = new Date(today);
+  in7Days.setDate(in7Days.getDate() + 7);
+  return d > today && d <= in7Days;
 }
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function formatFullDate(dateStr: string) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
+function dateKey(dateStr: string) {
+  return new Date(dateStr).toDateString();
 }
 
 export default function TasksPage() {
@@ -44,16 +64,24 @@ export default function TasksPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
 
-  // Split tasks: today (deadline is today or no deadline) vs upcoming (deadline in future)
+  // Split tasks: today (deadline is today or no deadline) vs next 7 days vs overdue
   const today = allTasks.filter((task) => !task.deadline || isToday(task.deadline));
-  const upcoming = allTasks.filter((task) => isUpcoming(task.deadline));
-  const overdue = allTasks.filter((task) => {
-    if (!task.deadline) return false;
-    const d = new Date(task.deadline);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return d < today;
-  });
+  const overdue = allTasks.filter((task) => isOverdue(task.deadline));
+
+  // Group upcoming (next 7 days) tasks by their exact due date
+  const next7Days = allTasks.filter((task) => isWithinNext7Days(task.deadline));
+  const groupedUpcoming = next7Days
+    .reduce<{ dateKey: string; tasks: Task[] }[]>((acc, task) => {
+      const key = dateKey(task.deadline!);
+      const existing = acc.find((g) => g.dateKey === key);
+      if (existing) {
+        existing.tasks.push(task);
+      } else {
+        acc.push({ dateKey: key, tasks: [task] });
+      }
+      return acc;
+    }, [])
+    .sort((a, b) => new Date(a.dateKey).getTime() - new Date(b.dateKey).getTime());
 
   const toggleTask = (id: number) => {
     setAllTasks(allTasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
@@ -256,20 +284,31 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Upcoming */}
+        {/* Next 7 Days — grouped by specific due date */}
         <div>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            {t("tasks.upcoming")}
+            Next 7 Days
           </h2>
-          <div className="rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
-            {upcoming.length === 0 ? (
-              <p className="py-6 text-center text-sm text-ink-muted">Nothing upcoming.</p>
-            ) : (
-              upcoming.map((task) => (
-                <TaskRow key={task.id} task={task} listLabel="upcoming" />
-              ))
-            )}
-          </div>
+          {groupedUpcoming.length === 0 ? (
+            <div className="rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
+              <p className="py-6 text-center text-sm text-ink-muted">Nothing in the next 7 days.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {groupedUpcoming.map((group) => (
+                <div key={group.dateKey}>
+                  <p className="mb-1.5 px-1 text-[11px] font-semibold text-ink-soft">
+                    {formatFullDate(group.dateKey)}
+                  </p>
+                  <div className="rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
+                    {group.tasks.map((task) => (
+                      <TaskRow key={task.id} task={task} listLabel="upcoming" />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
