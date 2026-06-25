@@ -49,6 +49,10 @@ const resources = {
       "auth.errorEmailInUse": "This email is already registered.",
       "auth.demoMode": "Demo mode — any email/password will work.",
       "auth.logout": "Log Out",
+      "auth.successTitle": "Account Created!",
+      "auth.successBody": "Your Study Garden account is ready.",
+      "auth.successEmailSent": "We've sent a welcome email with your login link.",
+      "auth.successLoginButton": "Go to Login",
 
       // Language toggle
       "lang.toggle": "EN | JP",
@@ -138,6 +142,10 @@ const resources = {
       "auth.errorEmailInUse": "このメールアドレスはすでに登録されています。",
       "auth.demoMode": "デモモード — どのメール/パスワードでもログインできます。",
       "auth.logout": "ログアウト",
+      "auth.successTitle": "アカウント作成完了！",
+      "auth.successBody": "Study Gardenアカウントが作成されました。",
+      "auth.successEmailSent": "ログインリンク付きのウェルカムメールを送信しました。",
+      "auth.successLoginButton": "ログインへ",
 
       // Language toggle
       "lang.toggle": "EN | JP",

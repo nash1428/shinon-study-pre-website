@@ -168,15 +168,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = useCallback(async (email: string, password: string, name: string) => {
     if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
     const cred = await createUserWithEmailAndPassword(auth, email, password);
+
     if (cred.user) {
-      await updateProfile(cred.user, { displayName: name });
+      // updateProfile — non-blocking (don't let it hang the UI)
+      updateProfile(cred.user, { displayName: name }).catch(() => {});
+
       if (db) {
         const newProfile: UserProfile = { ...defaultProfile, email, name };
-        await setDoc(doc(db, "users", cred.user.uid), newProfile);
         profileCache.set(cred.user.uid, newProfile);
         try {
           localStorage.setItem("studyspace_profile_backup", JSON.stringify(newProfile));
         } catch {}
+        // Fire and forget — same pattern as saveProfile
+        setDoc(doc(db, "users", cred.user.uid), newProfile).catch((err) => {
+          console.error("Firestore save failed (localStorage backup used):", err);
+        });
       }
     }
 

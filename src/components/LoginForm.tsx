@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Mail, Lock, User, AlertCircle, Loader2 } from "lucide-react";
+import { Mail, Lock, User, AlertCircle, Loader2, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
@@ -17,6 +17,7 @@ export default function LoginForm() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -26,6 +27,7 @@ export default function LoginForm() {
     try {
       if (mode === "login") {
         await login(email, password);
+        router.push("/");
       } else {
         if (name.trim().length < 2) {
           setError(t("auth.name"));
@@ -33,9 +35,17 @@ export default function LoginForm() {
           return;
         }
         await signup(email, password, name);
+
+        // Trigger welcome email (non-blocking — don't let it hang the UI)
+        fetch("/api/send-welcome-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, name }),
+        }).catch(() => {});
+
+        // Show success state instead of redirecting immediately
+        setSuccess(true);
       }
-      // Redirect immediately — user is already set in context
-      router.push("/");
     } catch (err: any) {
       // Map Firebase error codes to translated messages
       const code = err?.code || "";
@@ -72,6 +82,35 @@ export default function LoginForm() {
 
         {/* Card */}
         <div className="rounded-2xl bg-white p-7 shadow-[var(--shadow-card)]">
+          {success ? (
+            /* Success state — shown after successful registration */
+            <div className="flex flex-col items-center py-6 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-moss/10">
+                <Check className="h-7 w-7 text-moss" strokeWidth={3} />
+              </div>
+              <h2 className="mb-2 text-lg font-semibold text-ink">
+                {t("auth.successTitle")}
+              </h2>
+              <p className="mb-1 text-sm text-ink-soft">
+                {t("auth.successBody")}
+              </p>
+              <p className="mb-6 text-xs text-ink-muted">
+                {t("auth.successEmailSent")}
+              </p>
+              <button
+                onClick={() => {
+                  setSuccess(false);
+                  setMode("login");
+                  setName("");
+                  setPassword("");
+                }}
+                className="w-full rounded-xl bg-moss py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark"
+              >
+                {t("auth.successLoginButton")}
+              </button>
+            </div>
+          ) : (
+          <>
           {/* Mode toggle */}
           <div className="mb-5 flex rounded-xl bg-ivory-warm p-1">
             <button
@@ -178,6 +217,8 @@ export default function LoginForm() {
               {mode === "login" ? t("auth.signup") : t("auth.login")}
             </button>
           </p>
+          </>
+          )}
         </div>
 
         {/* Demo mode notice */}
