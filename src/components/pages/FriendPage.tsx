@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import {
-  Lock, Clock, Target, Flame, TrendingUp, Users, Calendar, MapPin, GraduationCap,
+  Lock, Clock, Target, Flame, TrendingUp, Users, Calendar, MapPin, GraduationCap, Search, UserPlus, Loader2,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -18,6 +18,15 @@ interface FriendUser {
     totalMinutes: number;
     sessionsCompleted: number;
   };
+}
+
+interface SearchResultUser {
+  id: string;
+  name: string;
+  email: string;
+  university: string;
+  avatarUrl: string | null;
+  isPrivate: boolean;
 }
 
 const mockFriends: FriendUser[] = [
@@ -173,18 +182,52 @@ function FriendCard({ friend }: { friend: FriendUser }) {
 }
 
 export default function FriendPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [focusCount] = useLocalStorage<number>("studyspace_focus_count", 0);
   const [focusMinutes] = useLocalStorage<number>("studyspace_focus_minutes", 0);
+  const [totalPoints] = useLocalStorage<number>("studyspace_focus_points", 0);
+
+  // Friend search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Current user's own stats
   const myStats = {
     totalMinutes: focusMinutes,
     sessionsCompleted: focusCount,
+    points: totalPoints,
   };
 
   const totalFollowers = useMemo(() => mockFriends.filter(f => f.followers.includes(currentUserId)).length, []);
   const totalFollowing = mockFriends.length;
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) return;
+    setSearching(true);
+    setHasSearched(true);
+    try {
+      const res = await fetch("/api/search-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          searchTerm: searchQuery.trim(),
+          currentUserId: user?.uid || "currentUser",
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSearchResults(data.users);
+      } else {
+        setSearchResults([]);
+      }
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   return (
     <div className="page-enter space-y-6">
@@ -239,7 +282,7 @@ export default function FriendPage() {
         </div>
 
         {/* My study stats summary */}
-        <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="mt-5 grid grid-cols-4 gap-3">
           <div className="rounded-xl bg-moss/5 p-3 text-center">
             <Clock className="mx-auto mb-1 h-4 w-4 text-moss" />
             <p className="text-sm font-bold text-ink">{formatStudyTime(myStats.totalMinutes)}</p>
@@ -259,6 +302,11 @@ export default function FriendPage() {
             </p>
             <p className="text-[10px] text-ink-muted">Avg/Session</p>
           </div>
+          <div className="rounded-xl bg-gold/10 p-3 text-center">
+            <Flame className="mx-auto mb-1 h-4 w-4 text-gold-dark" />
+            <p className="text-sm font-bold text-gold-dark">{myStats.points}</p>
+            <p className="text-[10px] text-ink-muted">Points</p>
+          </div>
         </div>
       </div>
 
@@ -266,6 +314,88 @@ export default function FriendPage() {
       <div>
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Focus Session</h2>
         <FocusTimer />
+      </div>
+
+      {/* Friend Search */}
+      <div>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Find Friends</h2>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="Search by name or email..."
+              className="w-full rounded-xl border border-ivory-deep bg-white py-3 pl-11 pr-4 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={!searchQuery.trim() || searching}
+            className="flex items-center gap-1.5 rounded-xl bg-moss px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
+          >
+            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            Search
+          </button>
+        </div>
+
+        {/* Search results */}
+        {hasSearched && (
+          <div className="mt-3 space-y-2">
+            {searching ? (
+              <p className="py-4 text-center text-sm text-ink-muted">Searching...</p>
+            ) : searchResults.length === 0 ? (
+              <div className="rounded-xl bg-white p-6 text-center shadow-[var(--shadow-card)]">
+                <p className="text-sm text-ink-muted">
+                  No users found for <span className="font-semibold text-ink">"{searchQuery}"</span>
+                </p>
+                <p className="mt-1 text-xs text-ink-muted/60">Try a different name or email.</p>
+              </div>
+            ) : (
+              searchResults.map((resultUser) => (
+                <div
+                  key={resultUser.id}
+                  className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-[var(--shadow-card)]"
+                >
+                  {resultUser.avatarUrl ? (
+                    <img
+                      src={resultUser.avatarUrl}
+                      alt={resultUser.name}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/20 font-bold text-gold-dark">
+                      {resultUser.name?.[0] || "S"}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-ink">{resultUser.name}</p>
+                    {resultUser.university && (
+                      <p className="text-[11px] text-ink-muted">
+                        <GraduationCap className="inline h-3 w-3 mr-0.5" />
+                        {resultUser.university}
+                      </p>
+                    )}
+                    {resultUser.isPrivate && (
+                      <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-ink-muted">
+                        <Lock className="h-2.5 w-2.5" /> Private
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="flex items-center gap-1 rounded-lg bg-moss/10 px-3 py-1.5 text-xs font-medium text-moss transition-colors hover:bg-moss/20"
+                    title="Send friend request"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Add Friend
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {/* Friends list */}
