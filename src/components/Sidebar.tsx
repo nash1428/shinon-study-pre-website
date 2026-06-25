@@ -190,7 +190,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
         </div>
       )}
 
-      {/* Navigation */}
+      {/* Navigation + Profile (scrollable together so profile pushes items down) */}
       <nav className="flex-1 overflow-y-auto px-3 py-2">
         {!isCollapsed && (
           <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
@@ -228,148 +228,148 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
             );
           })}
         </div>
-      </nav>
 
-      {/* Expandable Profile Section */}
-      <div className="border-t border-ivory-deep/60">
-        {isCollapsed ? (
-          /* Collapsed sidebar — avatar only */
-          <button
-            onClick={handleAvatarClickCollapsed}
-            className="flex w-full items-center justify-center py-4 transition-colors hover:bg-ivory-warm/30"
-            title={profile.name}
-          >
-            <div className="relative group/avatar">
-              <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
-              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover/avatar:opacity-100">
-                <PanelLeftOpen className="h-4 w-4 text-white" />
-              </div>
-            </div>
-          </button>
-        ) : isExpanded ? (
-          /* Expanded — editable form */
-          <div className="max-h-[70vh] overflow-y-auto px-4 pb-4">
-            <div className="flex items-center gap-3 py-3">
+        {/* Profile Section — inside nav so it expands and pushes content naturally */}
+        <div className="mt-2 border-t border-ivory-deep/60 pt-2">
+          {isCollapsed ? (
+            /* Collapsed sidebar — avatar only */
+            <button
+              onClick={handleAvatarClickCollapsed}
+              className="flex w-full items-center justify-center py-4 transition-colors hover:bg-ivory-warm/30"
+              title={profile.name}
+            >
               <div className="relative group/avatar">
-                <Avatar size={48} url={draft.avatarUrl} name={draft.name} />
+                <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover/avatar:opacity-100">
+                  <PanelLeftOpen className="h-4 w-4 text-white" />
+                </div>
+              </div>
+            </button>
+          ) : isExpanded ? (
+            /* Expanded — editable form (accordion-style, pushes content down) */
+            <div className="overflow-hidden px-1" style={{ animation: "sidebar-expand 0.2s ease-out" }}>
+              <div className="flex items-center gap-3 py-3 px-3">
+                <div className="relative group/avatar">
+                  <Avatar size={48} url={draft.avatarUrl} name={draft.name} />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover/avatar:opacity-100"
+                    title={t("profile.changePhoto")}
+                  >
+                    <Camera className="h-5 w-5 text-white" />
+                  </button>
+                </div>
+                <div className="flex-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+                    {t("profile.changePhoto")}
+                  </span>
+                  {draft.avatarUrl && (
+                    <button
+                      onClick={handleRemovePhoto}
+                      className="ml-2 flex items-center gap-1 text-[10px] text-red-400 hover:text-red-500"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                      {t("profile.removePhoto")}
+                    </button>
+                  )}
+                </div>
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover/avatar:opacity-100"
-                  title={t("profile.changePhoto")}
+                  onClick={handleCancel}
+                  className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm/50"
                 >
-                  <Camera className="h-5 w-5 text-white" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="flex-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                  {t("profile.changePhoto")}
-                </span>
-                {draft.avatarUrl && (
-                  <button
-                    onClick={handleRemovePhoto}
-                    className="ml-2 flex items-center gap-1 text-[10px] text-red-400 hover:text-red-500"
-                  >
-                    <Trash2 className="h-2.5 w-2.5" />
-                    {t("profile.removePhoto")}
-                  </button>
-                )}
+
+              <div className="space-y-2.5 px-3">
+                {profileFields.map((field) => (
+                  <div key={field.key}>
+                    <label className="mb-0.5 block text-[10px] font-medium text-ink-muted">
+                      {t(field.labelKey)}
+                    </label>
+                    <input
+                      type="text"
+                      value={draft[field.key] || ""}
+                      onChange={(e) =>
+                        setDraft({ ...draft, [field.key]: e.target.value })
+                      }
+                      className="w-full rounded-lg border border-ivory-deep bg-white px-3 py-2 text-xs text-ink focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                    />
+                  </div>
+                ))}
               </div>
-              <button
-                onClick={handleCancel}
-                className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm/50"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
 
-            <div className="space-y-2.5">
-              {profileFields.map((field) => (
-                <div key={field.key}>
-                  <label className="mb-0.5 block text-[10px] font-medium text-ink-muted">
-                    {t(field.labelKey)}
-                  </label>
-                  <input
-                    type="text"
-                    value={draft[field.key] || ""}
-                    onChange={(e) =>
-                      setDraft({ ...draft, [field.key]: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-ivory-deep bg-white px-3 py-2 text-xs text-ink focus:border-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-100"
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Privacy toggle */}
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-ivory-warm/50 px-3 py-2.5">
-              <span className="text-xs font-medium text-ink-soft">
-                {t("profile.private")}
-              </span>
-              <button
-                onClick={() => setDraft({ ...draft, isPrivate: !draft.isPrivate })}
-                className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
-                  draft.isPrivate ? "bg-moss" : "bg-stone-light"
-                }`}
-              >
-                <div
-                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                    draft.isPrivate ? "translate-x-4" : "translate-x-0.5"
+              {/* Privacy toggle */}
+              <div className="mt-3 mx-3 flex items-center justify-between rounded-lg bg-ivory-warm/50 px-3 py-2.5">
+                <span className="text-xs font-medium text-ink-soft">
+                  {t("profile.private")}
+                </span>
+                <button
+                  onClick={() => setDraft({ ...draft, isPrivate: !draft.isPrivate })}
+                  className={`relative h-5 w-9 rounded-full transition-colors duration-200 ${
+                    draft.isPrivate ? "bg-moss" : "bg-stone-light"
                   }`}
-                />
+                >
+                  <div
+                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                      draft.isPrivate ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-3 mx-3 flex gap-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saveStatus === "saving"}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-colors ${
+                    saveStatus === "saved"
+                      ? "bg-moss"
+                      : saveStatus === "error"
+                      ? "bg-red-400"
+                      : "bg-moss hover:bg-moss-dark"
+                  } disabled:opacity-50`}
+                >
+                  {saveStatus === "saving" && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {saveStatus === "saved" && <Check className="h-3 w-3" />}
+                  {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : t("profile.save")}
+                </button>
+                <button
+                  onClick={handleCancel}
+                  className="rounded-lg border border-ivory-deep px-3 py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-ivory-warm/50"
+                >
+                  {t("profile.cancel")}
+                </button>
+              </div>
+
+              {/* Logout button */}
+              <button
+                onClick={() => logout()}
+                className="mt-2 mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center justify-center gap-1.5 rounded-lg border border-ivory-deep py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500"
+              >
+                <LogOut className="h-3 w-3" />
+                {t("auth.logout")}
               </button>
             </div>
-
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={handleSave}
-                disabled={saveStatus === "saving"}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium text-white transition-colors ${
-                  saveStatus === "saved"
-                    ? "bg-moss"
-                    : saveStatus === "error"
-                    ? "bg-red-400"
-                    : "bg-moss hover:bg-moss-dark"
-                } disabled:opacity-50`}
-              >
-                {saveStatus === "saving" && <Loader2 className="h-3 w-3 animate-spin" />}
-                {saveStatus === "saved" && <Check className="h-3 w-3" />}
-                {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : t("profile.save")}
-              </button>
-              <button
-                onClick={handleCancel}
-                className="rounded-lg border border-ivory-deep px-3 py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-ivory-warm/50"
-              >
-                {t("profile.cancel")}
-              </button>
-            </div>
-
-            {/* Logout button */}
+          ) : (
+            /* Collapsed profile — avatar + name + chevron (toggles expansion) */
             <button
-              onClick={() => logout()}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-ivory-deep py-2 text-xs font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500"
+              onClick={() => {
+                setDraft(profile);
+                setIsExpanded(true);
+              }}
+              className="flex w-full items-center gap-3 px-3 py-4 transition-colors hover:bg-ivory-warm/30"
             >
-              <LogOut className="h-3 w-3" />
-              {t("auth.logout")}
+              <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
+              <div className="flex-1 min-w-0 text-left">
+                <p className="truncate text-sm font-medium text-ink">{profile.name}</p>
+                <p className="truncate text-[11px] text-ink-muted">{profile.university || profile.email}</p>
+              </div>
+              <ChevronUp className="h-4 w-4 text-ink-muted" />
             </button>
-          </div>
-        ) : (
-          /* Collapsed profile — avatar + name + chevron */
-          <button
-            onClick={() => {
-              setDraft(profile);
-              setIsExpanded(true);
-            }}
-            className="flex w-full items-center gap-3 px-4 py-4 transition-colors hover:bg-ivory-warm/30"
-          >
-            <Avatar size={32} url={profile.avatarUrl} name={profile.name} />
-            <div className="flex-1 min-w-0 text-left">
-              <p className="truncate text-sm font-medium text-ink">{profile.name}</p>
-              <p className="truncate text-[11px] text-ink-muted">{profile.university || profile.email}</p>
-            </div>
-            <ChevronUp className="h-4 w-4 text-ink-muted" />
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      </nav>
     </aside>
   );
 }

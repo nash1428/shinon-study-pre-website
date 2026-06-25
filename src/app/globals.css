@@ -100,6 +100,11 @@ h1, h2, h3, .font-serif {
 }
 
 .page-enter { animation: fade-in 0.3s ease-out; }
+
+@keyframes sidebar-expand {
+  from { opacity: 0; max-height: 0; transform: translateY(-8px); }
+  to { opacity: 1; max-height: 80vh; transform: translateY(0); }
+}
 .animate-ripple { animation: ripple 3s ease-out infinite; }
 .animate-leaf { animation: leaf-fall 8s linear infinite; }
 .animate-sway { animation: sway 4s ease-in-out infinite; }
