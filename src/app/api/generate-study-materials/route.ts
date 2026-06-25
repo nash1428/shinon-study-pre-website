@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     if (type === "anki") {
       const completion = await client.chat.completions.create({
-        model: "qwen/qwen3.5-9b",
+        model: "openai/gpt-oss-120b",
         messages: [
           {
             role: "system",
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ankiCards: Array.isArray(ankiCards) ? ankiCards : [] });
     } else {
       const completion = await client.chat.completions.create({
-        model: "qwen/qwen3.5-9b",
+        model: "openai/gpt-oss-120b",
         messages: [
           {
             role: "system",
