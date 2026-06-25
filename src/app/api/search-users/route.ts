@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collection, doc, getDoc, getDocs, query, limit } from "firebase/firestore";
+import { collection, getDocs, query, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+// Import the in-memory user registry (fallback when Firestore is unavailable)
+import { userRegistry, type RegisteredUser } from "../register-user/route";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,53 +13,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, users: [] });
     }
 
-    if (!db) {
-      console.warn("[search-users] Firestore not configured");
-      return NextResponse.json({ ok: true, users: [] });
-    }
-
     const term = searchTerm.toLowerCase().trim();
 
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, limit(50));
-    const snapshot = await getDocs(q);
-
-    // Fetch current user's data for relationship checks
-    let currentUserData: { followers?: string[]; following?: string[]; friends?: string[]; friendRequests?: string[] } = {};
-    try {
-      const currentUserDoc = await getDoc(doc(db, "users", currentUserId));
-      if (currentUserDoc.exists()) {
-        const d = currentUserDoc.data();
-        currentUserData = {
-          followers: d.followers || [],
-          following: d.following || [],
-          friends: d.friends || [],
-          friendRequests: d.friendRequests || [],
-        };
+    // Try Firestore first
+    let firestoreResults: RegisteredUser[] = [];
+    if (db) {
+      try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, limit(50));
+        const snapshot = await getDocs(q);
+        firestoreResults = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            name: data.name || "",
+            email: data.email || "",
+            university: data.university || "",
+            avatarUrl: data.avatarUrl || null,
+            isPrivate: data.isPrivate || false,
+            followers: data.followers || [],
+            following: data.following || [],
+            friends: data.friends || [],
+            friendRequests: data.friendRequests || [],
+            registeredAt: "",
+          } as RegisteredUser;
+        });
+      } catch (err) {
+        console.warn("[search-users] Firestore query failed, using fallback registry");
       }
-    } catch {}
+    }
 
-    const results = snapshot.docs
-      .map((docSnap) => {
-        const data = docSnap.data();
-        const userId = docSnap.id;
-        return {
-          id: userId,
-          name: data.name || "",
-          email: data.email || "",
-          university: data.university || "",
-          avatarUrl: data.avatarUrl || null,
-          isPrivate: data.isPrivate || false,
-          followers: data.followers || [],
-          following: data.following || [],
-          friends: data.friends || [],
-          friendRequests: data.friendRequests || [],
-          // Relationship status from current user's perspective
-          isFriend: (currentUserData.friends || []).includes(userId),
-          isFollowing: (currentUserData.following || []).includes(userId),
-          hasPendingRequest: (currentUserData.friendRequests || []).includes(userId) || (data.friendRequests || []).includes(currentUserId),
-        };
-      })
+    // If Firestore returned nothing, use the in-memory registry
+    const sourceUsers = firestoreResults.length > 0
+      ? firestoreResults
+      : Array.from(userRegistry.values());
+
+    if (sourceUsers.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        users: [],
+        message: "No users found. Firestore is not configured — ask your friend to log in so they appear in the registry.",
+      });
+    }
+
+    // Get current user's relationship data
+    const currentUser = userRegistry.get(currentUserId);
+    const currentUserFriends: string[] = currentUser?.friends || [];
+    const currentUserFollowing: string[] = currentUser?.following || [];
+    const currentUserRequests: string[] = currentUser?.friendRequests || [];
+
+    const results = sourceUsers
       .filter((user) => {
         if (user.id === currentUserId) return false;
         return (
@@ -64,9 +70,24 @@ export async function POST(req: NextRequest) {
           user.email.toLowerCase().includes(term)
         );
       })
+      .map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        university: user.university,
+        avatarUrl: user.avatarUrl,
+        isPrivate: user.isPrivate,
+        isFriend: currentUserFriends.includes(user.id),
+        isFollowing: currentUserFollowing.includes(user.id),
+        hasPendingRequest: currentUserRequests.includes(user.id) || user.friendRequests?.includes(currentUserId) || false,
+      }))
       .slice(0, 10);
 
-    return NextResponse.json({ ok: true, users: results });
+    return NextResponse.json({
+      ok: true,
+      users: results,
+      source: firestoreResults.length > 0 ? "firestore" : "registry",
+    });
   } catch (err) {
     console.error("[search-users] Failed:", err);
     const message = err instanceof Error ? err.message : "Failed to search users";

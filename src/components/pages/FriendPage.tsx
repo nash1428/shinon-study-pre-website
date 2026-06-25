@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Lock, Clock, Target, Flame, TrendingUp, Users, Calendar, MapPin, GraduationCap, Search, UserPlus, Loader2, UserCheck, Bell,
 } from "lucide-react";
@@ -207,6 +207,26 @@ export default function FriendPage() {
   const totalFollowers = useMemo(() => mockFriends.filter(f => f.followers.includes(currentUserId)).length, []);
   const totalFollowing = mockFriends.length;
 
+  // Auto-register the current user so they appear in search results
+  useEffect(() => {
+    if (!user || !profile) return;
+    user.getIdToken().then((idToken) => {
+      fetch("/api/register-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idToken,
+          profile: {
+            name: profile.name,
+            university: profile.university,
+            avatarUrl: profile.avatarUrl,
+            isPrivate: profile.isPrivate,
+          },
+        }),
+      }).catch(() => {});
+    });
+  }, [user, profile]);
+
   const handleSearch = async () => {
     if (!searchQuery.trim() || searchQuery.trim().length < 2) return;
     setSearching(true);
@@ -394,7 +414,9 @@ export default function FriendPage() {
                 <p className="text-sm text-ink-muted">
                   No users found for <span className="font-semibold text-ink">"{searchQuery}"</span>
                 </p>
-                <p className="mt-1 text-xs text-ink-muted/60">Try a different name or email.</p>
+                <p className="mt-1 text-xs text-ink-muted/60">
+                  Make sure your friend has logged in to Study Garden at least once, then search by their name or email.
+                </p>
               </div>
             ) : (
               searchResults.map((resultUser) => (
