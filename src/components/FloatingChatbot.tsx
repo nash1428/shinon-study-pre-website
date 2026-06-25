@@ -18,37 +18,18 @@ const botResponses = [
 ];
 
 /**
- * Fox Chatbot Icon — used in both closed (docked) and open (header) states.
- * SVG placeholder matching the fox theme (fox orange #FF8C42).
- * TODO: Replace with final EXPRESSION icon assets from the design collection.
+ * Fox Sensei chatbot icon — uses the custom image asset.
  */
 function FoxChatIcon({ size = 24 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 48 48" width={size} height={size} fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Ears */}
-      <path d="M 12 14 L 8 4 L 18 10 Z" fill="#FF8C42" />
-      <path d="M 36 14 L 40 4 L 30 10 Z" fill="#FF8C42" />
-      <path d="M 13 11 L 11 7 L 16 10 Z" fill="#FFF" opacity="0.5" />
-      <path d="M 35 11 L 37 7 L 32 10 Z" fill="#FFF" opacity="0.5" />
-
-      {/* Head */}
-      <ellipse cx="24" cy="26" rx="15" ry="13" fill="#FF8C42" />
-
-      {/* White face */}
-      <path d="M 24 18 Q 15 24 17 33 Q 24 36 31 33 Q 33 24 24 18 Z" fill="#FFFCF5" />
-
-      {/* Eyes — happy expression */}
-      <circle cx="18" cy="25" r="2" fill="#2E2B26" />
-      <circle cx="30" cy="25" r="2" fill="#2E2B26" />
-      <circle cx="18.7" cy="24.3" r="0.6" fill="#FFF" />
-      <circle cx="30.7" cy="24.3" r="0.6" fill="#FFF" />
-
-      {/* Nose */}
-      <path d="M 22 30 Q 24 32 26 30 Q 24 28 22 30 Z" fill="#2E2B26" />
-
-      {/* Smile */}
-      <path d="M 21 32 Q 24 35 27 32" stroke="#2E2B26" strokeWidth="0.8" fill="none" strokeLinecap="round" />
-    </svg>
+    <img
+      src="/chatbot-icon.jpg"
+      alt="Fox Sensei"
+      width={size}
+      height={size}
+      className="rounded-full object-cover"
+      style={{ width: size, height: size }}
+    />
   );
 }
 
@@ -86,7 +67,6 @@ export default function FloatingChatbot() {
           {/* Header with fox icon */}
           <div className="flex items-center justify-between border-b border-ivory-deep/40 px-4 py-3">
             <div className="flex items-center gap-2">
-              {/* TODO: Replace with final EXPRESSION chatbot icon asset */}
               <FoxChatIcon size={20} />
               <span className="font-serif text-sm font-semibold text-ink">Fox Sensei</span>
             </div>
@@ -150,7 +130,6 @@ export default function FloatingChatbot() {
         className="fixed bottom-6 right-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95 border border-ivory-deep/40"
         title="Chat with Fox Sensei"
       >
-        {/* TODO: Replace with final EXPRESSION chatbot icon asset */}
         <FoxChatIcon size={32} />
       </button>
     </>
