@@ -1,29 +1,62 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { Check, Plus, Trash2, X, Calendar, AlignLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { todayTasks, upcomingTasks, type TaskItem } from "@/lib/data";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-interface Task {
-  id: number;
-  title: string;
-  done: boolean;
+interface Task extends TaskItem {
+  content?: string;
+  deadline?: string;
+}
+
+function isToday(dateStr?: string) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const today = new Date();
+  return d.toDateString() === today.toDateString();
+}
+
+function isUpcoming(dateStr?: string) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d > today;
+}
+
+function formatDate(dateStr?: string) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export default function TasksPage() {
   const { t } = useTranslation();
-  const [today, setToday] = useLocalStorage<Task[]>("studyspace_tasks_today", todayTasks as Task[]);
-  const [upcoming, setUpcoming] = useLocalStorage<Task[]>("studyspace_tasks_upcoming", upcomingTasks as Task[]);
+  const [allTasks, setAllTasks] = useLocalStorage<Task[]>("studyspace_tasks_all", [
+    ...todayTasks.map((t) => ({ ...t, content: "", deadline: "" })),
+    ...upcomingTasks.map((t) => ({ ...t, content: "", deadline: "" })),
+  ]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskList, setNewTaskList] = useState<"today" | "upcoming">("today");
+  const [newTaskContent, setNewTaskContent] = useState("");
+  const [newTaskDeadline, setNewTaskDeadline] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
 
-  const toggleTask = (list: "today" | "upcoming", id: number) => {
-    const setter = list === "today" ? setToday : setUpcoming;
-    const current = list === "today" ? today : upcoming;
-    setter(current.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  // Split tasks: today (deadline is today or no deadline) vs upcoming (deadline in future)
+  const today = allTasks.filter((task) => !task.deadline || isToday(task.deadline));
+  const upcoming = allTasks.filter((task) => isUpcoming(task.deadline));
+  const overdue = allTasks.filter((task) => {
+    if (!task.deadline) return false;
+    const d = new Date(task.deadline);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
+  });
+
+  const toggleTask = (id: number) => {
+    setAllTasks(allTasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   };
 
   const handleAddTask = () => {
@@ -32,49 +65,85 @@ export default function TasksPage() {
       id: Date.now(),
       title: newTaskTitle.trim(),
       done: false,
+      content: newTaskContent.trim() || undefined,
+      deadline: newTaskDeadline || undefined,
     };
-    if (newTaskList === "today") {
-      setToday([...today, newTask]);
-    } else {
-      setUpcoming([...upcoming, newTask]);
-    }
+    setAllTasks([...allTasks, newTask]);
     setNewTaskTitle("");
+    setNewTaskContent("");
+    setNewTaskDeadline("");
     setShowAddForm(false);
   };
 
-  const handleClearCompleted = () => {
-    setToday(today.filter((t) => !t.done));
-    setUpcoming(upcoming.filter((t) => !t.done));
+  const handleDeleteTask = (id: number) => {
+    setAllTasks(allTasks.filter((t) => t.id !== id));
+    if (expandedTaskId === id) setExpandedTaskId(null);
   };
 
-  const TaskItem = ({ task, list }: { task: Task; list: "today" | "upcoming" }) => (
-    <div
-      className={`flex items-center gap-3 py-3.5 transition-opacity ${
-        task.done ? "opacity-40" : "opacity-100"
-      }`}
-    >
-      <button
-        onClick={() => toggleTask(list, task.id)}
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-200 ${
-          task.done
-            ? "border-sage-500 bg-moss"
-            : "border-ivory-deep bg-white hover:border-sage-400"
-        }`}
-      >
-        {task.done && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-      </button>
-      <span
-        className={`text-sm transition-all duration-200 ${
-          task.done ? "text-ink-muted line-through" : "text-ink"
-        }`}
-      >
-        {task.title}
-      </span>
+  const handleClearCompleted = () => {
+    setAllTasks(allTasks.filter((t) => !t.done));
+  };
+
+  const TaskRow = ({ task, listLabel }: { task: Task; listLabel: string }) => (
+    <div className="group border-b border-stone-100 last:border-0">
+      <div className={`flex items-center gap-3 py-3.5 transition-opacity ${task.done ? "opacity-40" : "opacity-100"}`}>
+        <button
+          onClick={() => toggleTask(task.id)}
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-200 ${
+            task.done
+              ? "border-sage-500 bg-moss"
+              : "border-ivory-deep bg-white hover:border-sage-400"
+          }`}
+        >
+          {task.done && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+        </button>
+        <div
+          className="flex-1 cursor-pointer"
+          onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+        >
+          <span className={`text-sm transition-all duration-200 ${task.done ? "text-ink-muted line-through" : "text-ink"}`}>
+            {task.title}
+          </span>
+          {task.deadline && (
+            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-ivory-warm px-2 py-0.5 text-[10px] font-medium text-ink-muted">
+              <Calendar className="h-2.5 w-2.5" />
+              {formatDate(task.deadline)}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => handleDeleteTask(task.id)}
+          className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-opacity hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+          title="Delete task"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {/* Expanded content */}
+      {expandedTaskId === task.id && (
+        <div className="pb-3 pl-8 pr-4">
+          {task.content && (
+            <div className="mb-2 rounded-lg bg-ivory-warm/40 p-2.5">
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-muted">Content</p>
+              <p className="text-xs text-ink-soft">{task.content}</p>
+            </div>
+          )}
+          {task.deadline && (
+            <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+              <Calendar className="h-3 w-3" />
+              Due: {new Date(task.deadline).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </div>
+          )}
+          {!task.content && !task.deadline && (
+            <p className="text-[11px] text-ink-muted">No additional details.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 
   const todayCount = today.filter((t) => !t.done).length;
-  const completedCount = today.filter((t) => t.done).length + upcoming.filter((t) => t.done).length;
+  const completedCount = allTasks.filter((t) => t.done).length;
 
   return (
     <div className="page-enter">
@@ -105,39 +174,68 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Add task form */}
+      {/* Add task form — with content + deadline fields */}
       {showAddForm && (
-        <div className="mt-4 flex gap-2 rounded-2xl bg-white p-3 shadow-[var(--shadow-card)]">
-          <select
-            value={newTaskList}
-            onChange={(e) => setNewTaskList(e.target.value as "today" | "upcoming")}
-            className="rounded-lg border border-ivory-deep bg-white px-3 py-2 text-xs text-ink-soft focus:outline-none"
-          >
-            <option value="today">{t("tasks.today")}</option>
-            <option value="upcoming">{t("tasks.upcoming")}</option>
-          </select>
-          <input
-            type="text"
-            autoFocus
-            value={newTaskTitle}
-            onChange={(e) => setNewTaskTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
-            placeholder="Type a task title..."
-            className="flex-1 rounded-lg border border-ivory-deep bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
-          />
-          <button
-            onClick={handleAddTask}
-            disabled={!newTaskTitle.trim()}
-            className="rounded-lg bg-moss px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
-          >
-            Add
-          </button>
-          <button
-            onClick={() => { setShowAddForm(false); setNewTaskTitle(""); }}
-            className="rounded-lg px-2 text-ink-muted hover:bg-ivory-warm"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        <div className="mt-4 rounded-2xl bg-white p-4 shadow-[var(--shadow-card)]">
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                autoFocus
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
+                placeholder="Task title..."
+                className="flex-1 rounded-lg border border-ivory-deep bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+              />
+              <input
+                type="date"
+                value={newTaskDeadline}
+                onChange={(e) => setNewTaskDeadline(e.target.value)}
+                className="rounded-lg border border-ivory-deep bg-white px-3 py-2 text-xs text-ink-soft focus:outline-none focus:border-moss/30"
+              />
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <AlignLeft className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-muted" />
+                <input
+                  type="text"
+                  value={newTaskContent}
+                  onChange={(e) => setNewTaskContent(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
+                  placeholder="Task content / details (optional)..."
+                  className="w-full rounded-lg border border-ivory-deep bg-white py-2 pl-9 pr-3 text-xs text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+                />
+              </div>
+              <button
+                onClick={handleAddTask}
+                disabled={!newTaskTitle.trim()}
+                className="rounded-lg bg-moss px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
+              >
+                Add
+              </button>
+              <button
+                onClick={() => { setShowAddForm(false); setNewTaskTitle(""); setNewTaskContent(""); setNewTaskDeadline(""); }}
+                className="rounded-lg px-2 text-ink-muted hover:bg-ivory-warm"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Overdue tasks */}
+      {overdue.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-red-400">
+            Overdue
+          </h2>
+          <div className="rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
+            {overdue.map((task) => (
+              <TaskRow key={task.id} task={task} listLabel="overdue" />
+            ))}
+          </div>
         </div>
       )}
 
@@ -147,12 +245,12 @@ export default function TasksPage() {
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             {t("tasks.today")}
           </h2>
-          <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
+          <div className="rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
             {today.length === 0 ? (
               <p className="py-6 text-center text-sm text-ink-muted">All done! 🎉</p>
             ) : (
               today.map((task) => (
-                <TaskItem key={task.id} task={task} list="today" />
+                <TaskRow key={task.id} task={task} listLabel="today" />
               ))
             )}
           </div>
@@ -163,12 +261,12 @@ export default function TasksPage() {
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             {t("tasks.upcoming")}
           </h2>
-          <div className="divide-y divide-stone-100 rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
+          <div className="rounded-2xl bg-white px-5 shadow-[var(--shadow-card)]">
             {upcoming.length === 0 ? (
               <p className="py-6 text-center text-sm text-ink-muted">Nothing upcoming.</p>
             ) : (
               upcoming.map((task) => (
-                <TaskItem key={task.id} task={task} list="upcoming" />
+                <TaskRow key={task.id} task={task} listLabel="upcoming" />
               ))
             )}
           </div>

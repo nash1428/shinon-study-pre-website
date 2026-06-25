@@ -39,6 +39,17 @@ export const todaySchedule = [
   },
 ];
 
+export type AnkiCard = {
+  front: string;
+  back: string;
+};
+
+export type QuizQuestion = {
+  question: string;
+  options: string[];
+  answer: number;
+};
+
 export type NoteItem = {
   id: number;
   title: string;
@@ -47,6 +58,10 @@ export type NoteItem = {
   excerpt: string;
   fullContent?: string;
   fullWidth?: boolean;
+  pdfData?: string;
+  pdfName?: string;
+  ankiCards?: AnkiCard[];
+  quizQuestions?: QuizQuestion[];
 };
 
 export const recentNotes: NoteItem[] = [
@@ -84,6 +99,8 @@ export type TaskItem = {
   id: number;
   title: string;
   done: boolean;
+  content?: string;
+  deadline?: string;
 };
 
 export const todayTasks: TaskItem[] = [
