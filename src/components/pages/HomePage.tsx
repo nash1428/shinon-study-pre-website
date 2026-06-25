@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Sparkles, ChevronLeft, ChevronRight, Clock, MapPin,
-  FileText, X, ChevronDown, ChevronUp, Calendar, Loader2, Unlink, Plus, Trash2,
+  FileText, X, ChevronDown, ChevronUp, Calendar, Loader2, Unlink, Plus, Trash2, Pencil,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/AuthContext";
@@ -21,7 +21,17 @@ interface LocalEvent {
   date: string;
   startTime: string;
   endTime: string;
+  location: string;
   source: "local" | "google";
+}
+
+interface MergedEvent {
+  time: string;
+  endTime: string;
+  title: string;
+  location: string;
+  source: "local" | "google";
+  localEventId?: string;
 }
 
 const placeholderEvents: Record<string, { time: string; title: string; room: string }[]> = {
@@ -63,10 +73,12 @@ export default function HomePage() {
   // Local events (separate from Google Calendar)
   const [localEvents, setLocalEvents] = useLocalStorage<LocalEvent[]>("studyspace_local_events", []);
   const [showAddEvent, setShowAddEvent] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventDate, setNewEventDate] = useState(toISODate(today.getFullYear(), today.getMonth(), today.getDate()));
   const [newEventStart, setNewEventStart] = useState("09:00");
   const [newEventEnd, setNewEventEnd] = useState("10:00");
+  const [newEventLocation, setNewEventLocation] = useState("");
 
   useEffect(() => {
     if (googleCal.isConnected) googleCal.fetchForMonth(viewYear, viewMonth);
@@ -82,7 +94,7 @@ export default function HomePage() {
     return cells;
   }, [firstDayOfMonth, daysInMonth]);
 
-  // Build a map of local events by dateKey for the monthly calendar
+  // Build a map of local events by dateKey
   const localEventsByDate = useMemo(() => {
     const map: Record<string, LocalEvent[]> = {};
     localEvents.forEach((evt) => {
@@ -94,13 +106,13 @@ export default function HomePage() {
     return map;
   }, [localEvents]);
 
-  // Merge Google Calendar + placeholder + local events
+  // Merge Google Calendar + placeholder + local events into a unified structure
   const mergedEvents = useMemo(() => {
-    const merged: Record<string, { time: string; title: string; room: string; source: "local" | "google" }[]> = {};
+    const merged: Record<string, MergedEvent[]> = {};
     if (!googleCal.isConnected) {
       Object.entries(placeholderEvents).forEach(([key, events]) => {
         if (!merged[key]) merged[key] = [];
-        merged[key].push(...events.map(e => ({ ...e, source: "google" as const })));
+        events.forEach(e => merged[key].push({ time: e.time, endTime: "", title: e.title, location: e.room, source: "google" }));
       });
     }
     Object.entries(googleCal.eventsByDate).forEach(([key, events]) => {
@@ -108,21 +120,24 @@ export default function HomePage() {
       events.forEach((event) => {
         merged[key].push({
           time: event.start ? new Date(event.start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "All day",
+          endTime: event.end ? new Date(event.end).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "",
           title: event.title,
-          room: event.location || "",
-          source: "google" as const,
+          location: event.location || "",
+          source: "google",
         });
       });
     });
-    // Add local events
+    // Add local events with proper fields
     Object.entries(localEventsByDate).forEach(([key, events]) => {
       if (!merged[key]) merged[key] = [];
       events.forEach((evt) => {
         merged[key].push({
           time: evt.startTime,
+          endTime: evt.endTime,
           title: evt.title,
-          room: `${evt.startTime}–${evt.endTime}`,
-          source: "local" as const,
+          location: evt.location,
+          source: "local",
+          localEventId: evt.id,
         });
       });
     });
@@ -151,18 +166,54 @@ export default function HomePage() {
   const updateLectureData = (id: string, data: Partial<{ pdfName: string | null; note: string }>) =>
     setLectureNotes((prev) => ({ ...prev, [id]: { ...prev[id], ...data } }));
 
-  const handleAddLocalEvent = () => {
-    if (!newEventTitle.trim()) return;
-    const newEvent: LocalEvent = {
-      id: `local-${Date.now()}`,
-      title: newEventTitle.trim(),
-      date: newEventDate,
-      startTime: newEventStart,
-      endTime: newEventEnd,
-      source: "local",
-    };
-    setLocalEvents([...localEvents, newEvent]);
+  const openAddEventModal = (dateStr?: string) => {
+    setEditingEventId(null);
     setNewEventTitle("");
+    setNewEventDate(dateStr || toISODate(viewYear, viewMonth, selectedDateKey ? parseInt(selectedDateKey.split("-")[2]) : today.getDate()));
+    setNewEventStart("09:00");
+    setNewEventEnd("10:00");
+    setNewEventLocation("");
+    setShowAddEvent(true);
+  };
+
+  const openEditEventModal = (evt: LocalEvent) => {
+    setEditingEventId(evt.id);
+    setNewEventTitle(evt.title);
+    setNewEventDate(evt.date);
+    setNewEventStart(evt.startTime);
+    setNewEventEnd(evt.endTime);
+    setNewEventLocation(evt.location);
+    setShowAddEvent(true);
+  };
+
+  const handleSaveEvent = () => {
+    if (!newEventTitle.trim()) return;
+    if (editingEventId) {
+      // Edit existing
+      setLocalEvents(localEvents.map((e) => e.id === editingEventId ? {
+        ...e,
+        title: newEventTitle.trim(),
+        date: newEventDate,
+        startTime: newEventStart,
+        endTime: newEventEnd,
+        location: newEventLocation.trim(),
+      } : e));
+    } else {
+      // Add new
+      const newEvent: LocalEvent = {
+        id: `local-${Date.now()}`,
+        title: newEventTitle.trim(),
+        date: newEventDate,
+        startTime: newEventStart,
+        endTime: newEventEnd,
+        location: newEventLocation.trim(),
+        source: "local",
+      };
+      setLocalEvents([...localEvents, newEvent]);
+    }
+    setNewEventTitle("");
+    setNewEventLocation("");
+    setEditingEventId(null);
     setShowAddEvent(false);
   };
 
@@ -200,26 +251,26 @@ export default function HomePage() {
 
   const monthLabel = isJp ? `${viewYear}年${viewMonth + 1}月` : `${monthsEn[viewMonth]} ${viewYear}`;
 
-  // Events for today's vertical timeline (sorted by time)
+  // Events for today's vertical timeline
   const timelineEvents = useMemo(() => {
-    const result: { date: string; dateLabel: string; events: { time: string; title: string; endTime?: string; source: "local" | "google" }[] }[] = [];
     const d = new Date();
     const key = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
     const dayEvents = mergedEvents[key];
     if (dayEvents && dayEvents.length > 0) {
-      result.push({
+      return [{
         date: key,
         dateLabel: d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }),
-        events: dayEvents.map(e => ({
-          time: e.time,
-          title: e.title,
-          endTime: e.source === "local" ? e.room : undefined,
-          source: e.source,
-        })),
-      });
+        events: dayEvents,
+      }];
     }
-    return result;
+    return [];
   }, [mergedEvents]);
+
+  // Helper: find LocalEvent from merged event for edit/delete
+  const findLocalEvent = (evt: MergedEvent): LocalEvent | undefined => {
+    if (evt.localEventId) return localEvents.find((e) => e.id === evt.localEventId);
+    return undefined;
+  };
 
   return (
     <div className="page-enter space-y-6">
@@ -242,12 +293,8 @@ export default function HomePage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-serif text-lg font-semibold text-ink">{monthLabel}</h2>
               <div className="flex items-center gap-2">
-                {/* Add local event button */}
                 <button
-                  onClick={() => {
-                    setNewEventDate(toISODate(viewYear, viewMonth, selectedDateKey ? parseInt(selectedDateKey.split("-")[2]) : today.getDate()));
-                    setShowAddEvent(true);
-                  }}
+                  onClick={() => openAddEventModal()}
                   className="flex h-7 w-7 items-center justify-center rounded-lg bg-moss text-white transition-colors hover:bg-moss-dark"
                   title={isJp ? "追加" : "Add Event"}
                 >
@@ -322,27 +369,31 @@ export default function HomePage() {
                   <button onClick={() => setSelectedDateKey(null)} className="text-gold hover:text-gold-dark"><X className="h-3.5 w-3.5" /></button>
                 </div>
                 <div className="space-y-2">
-                  {mergedEvents[selectedDateKey].map((event, ei) => (
-                    <div key={ei} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
-                      <div className={`h-2 w-2 rounded-full shrink-0 ${event.source === "local" ? "bg-moss" : "bg-gold"}`} />
-                      <div className="flex-1">
-                        <p className="text-xs font-medium text-ink">{event.title}</p>
-                        {event.room && <p className="text-[10px] text-ink-muted">{event.room}</p>}
+                  {mergedEvents[selectedDateKey].map((event, ei) => {
+                    const localEvt = findLocalEvent(event);
+                    return (
+                      <div key={ei} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
+                        <div className={`h-2 w-2 rounded-full shrink-0 ${event.source === "local" ? "bg-moss" : "bg-gold"}`} />
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-ink">{event.title}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-ink-muted">
+                            <span>{event.time}{event.endTime ? `–${event.endTime}` : ""}</span>
+                            {event.location && <span className="flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{event.location}</span>}
+                          </div>
+                        </div>
+                        {localEvt && (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => openEditEventModal(localEvt)} className="text-ink-muted hover:text-moss" title="Edit">
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button onClick={() => handleDeleteLocalEvent(localEvt.id)} className="text-ink-muted hover:text-red-500" title="Delete">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-[10px] text-ink-muted">{event.time}</span>
-                      {event.source === "local" && (
-                        <button
-                          onClick={() => {
-                            const localEvt = localEvents.find((e) => e.title === event.title && e.startTime === event.time);
-                            if (localEvt) handleDeleteLocalEvent(localEvt.id);
-                          }}
-                          className="text-ink-muted hover:text-red-500"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -385,23 +436,39 @@ export default function HomePage() {
                             const lectureId = `${dayInfo.key}-${ei}`;
                             const isExpanded = expandedLecture === lectureId;
                             const lectureData = lectureNotes[lectureId] || { pdfName: null, note: "" };
+                            const localEvt = findLocalEvent(event);
                             return (
-                              <div key={ei}>
-                                <button onClick={() => { handleLectureClick(lectureId); setSelectedDateKey(dayInfo.key); }}
-                                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-all ${isExpanded ? "bg-moss/5 ring-1 ring-moss/20" : "bg-ivory-warm/50 hover:bg-ivory-warm"}`}>
-                                  <div className={`h-2 w-2 rounded-full shrink-0 ${event.source === "local" ? "bg-moss" : ei % 2 === 0 ? "bg-moss" : "bg-gold"}`} />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-ink truncate">{event.title}</p>
-                                    <p className="text-[11px] text-ink-muted truncate">{event.time}{event.room ? ` · ${event.room}` : ""}</p>
-                                  </div>
-                                  {isExpanded ? <ChevronUp className="h-4 w-4 text-ink-muted shrink-0" /> : <ChevronDown className="h-4 w-4 text-ink-muted shrink-0" />}
-                                </button>
+                              <div key={ei} className="group/event">
+                                <div className="flex items-center">
+                                  <button onClick={() => { handleLectureClick(lectureId); setSelectedDateKey(dayInfo.key); }}
+                                    className={`flex flex-1 items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-all ${isExpanded ? "bg-moss/5 ring-1 ring-moss/20" : "bg-ivory-warm/50 hover:bg-ivory-warm"}`}>
+                                    <div className={`h-2 w-2 rounded-full shrink-0 ${event.source === "local" ? "bg-moss" : "bg-gold"}`} />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-ink truncate">{event.title}</p>
+                                      <p className="text-[11px] text-ink-muted truncate">
+                                        {event.time}{event.endTime ? `–${event.endTime}` : ""}
+                                        {event.location ? ` · ${event.location}` : ""}
+                                      </p>
+                                    </div>
+                                    {isExpanded ? <ChevronUp className="h-4 w-4 text-ink-muted shrink-0" /> : <ChevronDown className="h-4 w-4 text-ink-muted shrink-0" />}
+                                  </button>
+                                  {localEvt && (
+                                    <div className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/event:opacity-100">
+                                      <button onClick={() => openEditEventModal(localEvt)} className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:text-moss hover:bg-moss/5" title="Edit">
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                      <button onClick={() => handleDeleteLocalEvent(localEvt.id)} className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:text-red-500 hover:bg-red-50" title="Delete">
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                                 {isExpanded && (
                                   <div className="mt-1 rounded-xl bg-moss/5 p-4 ring-1 ring-moss/20">
                                     <div className="space-y-2">
                                       <div className="flex items-center gap-2"><span className="w-16 text-[10px] font-medium text-ink-muted">{isJp ? "講義名" : "Lecture"}</span><span className="text-sm text-ink">{event.title}</span></div>
-                                      <div className="flex items-center gap-2"><Clock className="h-3 w-3 text-ink-muted" /><span className="text-xs text-ink-soft">{event.time}</span></div>
-                                      {event.room && <div className="flex items-center gap-2"><MapPin className="h-3 w-3 text-ink-muted" /><span className="text-xs text-ink-soft">{event.room}</span></div>}
+                                      <div className="flex items-center gap-2"><Clock className="h-3 w-3 text-ink-muted" /><span className="text-xs text-ink-soft">{event.time}{event.endTime ? `–${event.endTime}` : ""}</span></div>
+                                      {event.location && <div className="flex items-center gap-2"><MapPin className="h-3 w-3 text-ink-muted" /><span className="text-xs text-ink-soft">{event.location}</span></div>}
                                     </div>
                                     <div className="mt-3 border-t border-moss/10 pt-3">
                                       <span className="mb-1.5 block text-[10px] font-medium text-ink-muted">{isJp ? "講義PDF" : "Lecture PDF"}</span>
@@ -440,7 +507,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* New Vertical Timeline Calendar — next 7 days */}
+      {/* Today's Timeline */}
       <div className="rounded-2xl bg-white/80 p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
         <h2 className="mb-5 font-serif text-lg font-semibold text-ink">
           {isJp ? "今日のタイムライン" : "Today's Timeline"}
@@ -451,37 +518,47 @@ export default function HomePage() {
           </p>
         ) : (
           <div className="relative">
-            {/* Vertical line */}
             <div className="absolute left-[80px] top-2 bottom-2 w-0.5 bg-ivory-deep" />
             <div className="space-y-6">
               {timelineEvents.map((dayGroup) => (
                 <div key={dayGroup.date} className="flex gap-4">
-                  {/* Date label */}
                   <div className="flex w-[68px] flex-col items-end pt-0.5">
                     <span className="text-xs font-semibold text-ink">{dayGroup.dateLabel.split(",")[0]}</span>
                     <span className="text-[10px] text-ink-muted">{dayGroup.dateLabel.split(",").slice(1).join(",").trim()}</span>
                   </div>
-                  {/* Dot on timeline */}
                   <div className="relative flex w-[16px] shrink-0 justify-center pt-1.5">
                     <div className="h-3 w-3 rounded-full border-2 border-white bg-moss shadow-sm" />
                   </div>
-                  {/* Events for this day */}
                   <div className="flex-1 space-y-2 pb-1">
-                    {dayGroup.events.map((evt, ei) => (
-                      <div key={ei} className="flex items-center gap-3 rounded-xl bg-ivory-warm/40 px-4 py-3">
-                        <div className="flex flex-col items-center">
-                          <span className="text-xs font-bold text-moss">{evt.time}</span>
-                          {evt.endTime && <span className="text-[9px] text-ink-muted">{evt.endTime}</span>}
+                    {dayGroup.events.map((evt, ei) => {
+                      const localEvt = findLocalEvent(evt);
+                      return (
+                        <div key={ei} className="group/timeline flex items-center gap-3 rounded-xl bg-ivory-warm/40 px-4 py-3">
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs font-bold text-moss">{evt.time}</span>
+                            {evt.endTime && <span className="text-[9px] text-ink-muted">{evt.endTime}</span>}
+                          </div>
+                          <div className="h-8 w-px bg-ivory-deep" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-ink">{evt.title}</p>
+                            <div className="flex items-center gap-2 text-[10px] text-ink-muted">
+                              {evt.location && <span className="flex items-center gap-0.5"><MapPin className="h-2.5 w-2.5" />{evt.location}</span>}
+                              <span>{evt.source === "local" ? "Local" : "Google"}</span>
+                            </div>
+                          </div>
+                          {localEvt && (
+                            <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/timeline:opacity-100">
+                              <button onClick={() => openEditEventModal(localEvt)} className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:text-moss hover:bg-moss/5" title="Edit">
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                              <button onClick={() => handleDeleteLocalEvent(localEvt.id)} className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:text-red-500 hover:bg-red-50" title="Delete">
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <div className="h-8 w-px bg-ivory-deep" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-ink">{evt.title}</p>
-                          <p className="text-[10px] text-ink-muted">
-                            {evt.source === "local" ? "📍 Local event" : "📅 Google Calendar"}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -490,19 +567,19 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Add Local Event Modal */}
+      {/* Add/Edit Event Modal */}
       {showAddEvent && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4"
-          onClick={() => setShowAddEvent(false)}
+          onClick={() => { setShowAddEvent(false); setEditingEventId(null); }}
         >
           <div
             className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--shadow-float)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-ink">Add Event</h2>
-              <button onClick={() => setShowAddEvent(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm">
+              <h2 className="text-lg font-semibold text-ink">{editingEventId ? "Edit Event" : "Add Event"}</h2>
+              <button onClick={() => { setShowAddEvent(false); setEditingEventId(null); }} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -514,8 +591,17 @@ export default function HomePage() {
                   autoFocus
                   value={newEventTitle}
                   onChange={(e) => setNewEventTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddLocalEvent()}
                   placeholder="e.g., Study Group"
+                  className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">Location</label>
+                <input
+                  type="text"
+                  value={newEventLocation}
+                  onChange={(e) => setNewEventLocation(e.target.value)}
+                  placeholder="e.g., Library Room 204"
                   className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
                 />
               </div>
@@ -549,11 +635,11 @@ export default function HomePage() {
                 </div>
               </div>
               <button
-                onClick={handleAddLocalEvent}
+                onClick={handleSaveEvent}
                 disabled={!newEventTitle.trim()}
                 className="w-full rounded-xl bg-moss py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
               >
-                Add Event
+                {editingEventId ? "Save Changes" : "Add Event"}
               </button>
             </div>
           </div>
