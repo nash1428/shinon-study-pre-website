@@ -1,21 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Send } from "lucide-react";
+import { X, Send, Loader2 } from "lucide-react";
 
 interface Message {
   role: "user" | "bot";
   text: string;
 }
-
-const botResponses = [
-  "The garden grows with each step you take. What shall we work on?",
-  "Consider: what is the foundation of this concept?",
-  "Let us break this into smaller parts.",
-  "A quiet mind plants deep roots. Take your time.",
-  "What small step would move today's work forward?",
-  "Consistency is becoming your strength.",
-];
 
 /**
  * Fox Sensei chatbot icon — uses the custom image asset.
@@ -36,6 +27,7 @@ function FoxChatIcon({ size = 24 }: { size?: number }) {
 export default function FloatingChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     { role: "bot", text: "Welcome to your study garden. How may I guide you today?" },
   ]);
@@ -47,16 +39,26 @@ export default function FloatingChatbot() {
     }
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isThinking) return;
     const userMsg = input.trim();
     setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
     setInput("");
+    setIsThinking(true);
 
-    setTimeout(() => {
-      const response = botResponses[Math.floor(Math.random() * botResponses.length)];
-      setMessages((prev) => [...prev, { role: "bot", text: response }]);
-    }, 1200);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [...messages, { role: "user", text: userMsg }] }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [...prev, { role: "bot", text: data.reply || "I'm here. Tell me more." }]);
+    } catch {
+      setMessages((prev) => [...prev, { role: "bot", text: "The garden is resting. Please try again in a moment." }]);
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   return (
@@ -99,6 +101,18 @@ export default function FloatingChatbot() {
                 </div>
               </div>
             ))}
+            {isThinking && (
+              <div className="flex justify-start">
+                <div className="rounded-xl bg-ivory-warm/50 border border-ivory-deep/30 px-3 py-2">
+                  <span className="mb-0.5 block font-serif text-[10px] italic text-gold">Fox Sensei</span>
+                  <div className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted" style={{ animationDelay: "0ms" }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted" style={{ animationDelay: "150ms" }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ink-muted" style={{ animationDelay: "300ms" }} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Input */}
@@ -114,10 +128,10 @@ export default function FloatingChatbot() {
               />
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() || isThinking}
                 className="flex h-8 w-8 items-center justify-center rounded-xl bg-moss text-white transition-colors hover:bg-moss-dark disabled:opacity-40"
               >
-                <Send className="h-3.5 w-3.5" />
+                {isThinking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
