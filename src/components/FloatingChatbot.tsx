@@ -23,7 +23,7 @@ const botResponses = [
 function FoxChatIcon({ size = 24 }: { size?: number }) {
   return (
     <img
-      src="/chatbot-icon.jpg"
+      src="/app-icon.jpg"
       alt="Fox Sensei"
       width={size}
       height={size}
