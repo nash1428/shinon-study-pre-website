@@ -69,16 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Fetch profile in background — never blocks UI
   const fetchProfileInBackground = useCallback(async (uid: string, fallback: Partial<UserProfile>) => {
-    // 1. Check in-memory cache (instant)
+    // 1. Check in-memory cache (instant) — only for this user
     if (profileCache.has(uid)) {
       setProfile(profileCache.get(uid)!);
       return;
     }
 
-    // 2. Check localStorage backup (fast, offline-capable)
+    // 2. Check localStorage backup (per-user key to avoid cross-account mixing)
     let localProfile: UserProfile | null = null;
     try {
-      const backup = localStorage.getItem("studyspace_profile_backup");
+      const backup = localStorage.getItem(`studyspace_profile_${uid}`);
       if (backup) {
         localProfile = JSON.parse(backup) as UserProfile;
         profileCache.set(uid, localProfile);
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileCache.set(uid, fetched);
         setProfile(fetched);
         try {
-          localStorage.setItem("studyspace_profile_backup", JSON.stringify(fetched));
+          localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(fetched));
         } catch {}
       } else {
         const newProfile = { ...defaultProfile, ...fallback } as UserProfile;
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileCache.set(uid, newProfile);
         setProfile(newProfile);
         try {
-          localStorage.setItem("studyspace_profile_backup", JSON.stringify(newProfile));
+          localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(newProfile));
         } catch {}
       }
     } catch (err) {
@@ -151,6 +151,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
+
+    // Clear any previous user's cached profile to prevent cross-account mixing
+    profileCache.clear();
+    setProfile(null);
+
     // This triggers onAuthStateChanged automatically
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
@@ -177,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newProfile: UserProfile = { ...defaultProfile, email, name };
         profileCache.set(cred.user.uid, newProfile);
         try {
-          localStorage.setItem("studyspace_profile_backup", JSON.stringify(newProfile));
+          localStorage.setItem(`studyspace_profile_${cred.user.uid}`, JSON.stringify(newProfile));
         } catch {}
         // Fire and forget — same pattern as saveProfile
         setDoc(doc(db, "users", cred.user.uid), newProfile).catch((err) => {
@@ -199,6 +204,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setLoading(true);
+    // Clean up old shared key if it exists (migration)
+    try {
+      localStorage.removeItem("studyspace_profile_backup");
+    } catch {}
     await signOut(auth);
   }, []);
 
@@ -208,9 +217,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const currentUser = auth?.currentUser;
 
-    // Always save to localStorage synchronously (instant, reliable)
+    // Always save to localStorage synchronously (per-user key)
     try {
-      localStorage.setItem("studyspace_profile_backup", JSON.stringify(updatedProfile));
+      if (currentUser) {
+        localStorage.setItem(`studyspace_profile_${currentUser.uid}`, JSON.stringify(updatedProfile));
+      }
     } catch {}
 
     if (currentUser) {
