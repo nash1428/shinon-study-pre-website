@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,15 +9,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.warn("[generate-study-materials] OPENAI_API_KEY not configured");
-      // Return placeholder data so the UI still works
+      console.warn("[generate-study-materials] GEMINI_API_KEY not configured");
       if (type === "anki") {
         return NextResponse.json({
           ok: true,
           ankiCards: [
-            { front: "[AI not configured] What is the main topic?", back: "Configure OPENAI_API_KEY to generate real cards." },
+            { front: "[AI not configured] What is the main topic?", back: "Configure GEMINI_API_KEY to generate real cards." },
           ],
         });
       }
@@ -29,46 +28,41 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const openai = new OpenAI({ apiKey });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: { responseMimeType: "application/json" },
+    });
 
     const combinedContent = `Lecture PDF content:\n${pdfText || "(no PDF provided)"}\n\nNote content:\n${noteContent || "(no notes provided)"}`;
 
     if (type === "anki") {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a study assistant that creates Anki flashcards. Based on the provided study material, generate 5-10 high-quality Anki cards. Return ONLY a JSON array of objects with "front" and "back" fields. Example: [{"front":"What is X?","back":"X is..."}]`,
-          },
-          { role: "user", content: combinedContent },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 1200,
-      });
-
-      const raw = completion.choices[0]?.message?.content || "{}";
-      const parsed = JSON.parse(raw);
-      const ankiCards = parsed.cards || parsed.ankiCards || parsed.items || parsed;
+      const result = await model.generateContent(
+        `You are a study assistant that creates Anki flashcards. Based on the provided study material, generate 5-10 high-quality Anki cards. Return ONLY a JSON array of objects with "front" and "back" fields. Example: [{"front":"What is X?","back":"X is..."}]\n\n${combinedContent}`
+      );
+      const raw = result.response.text();
+      let ankiCards;
+      try {
+        ankiCards = JSON.parse(raw);
+      } catch {
+        // Try to extract array from the response
+        const match = raw.match(/\[[\s\S]*\]/);
+        ankiCards = match ? JSON.parse(match[0]) : [];
+      }
 
       return NextResponse.json({ ok: true, ankiCards: Array.isArray(ankiCards) ? ankiCards : [] });
     } else {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a study assistant that creates quiz questions. Based on the provided study material, generate 5 multiple-choice questions with 4 options each. Return ONLY a JSON object with a "questions" array. Each question has: "question" (string), "options" (array of 4 strings), "answer" (index 0-3 of correct option). Example: {"questions":[{"question":"What is X?","options":["A","B","C","D"],"answer":0}]}`,
-          },
-          { role: "user", content: combinedContent },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 1500,
-      });
-
-      const raw = completion.choices[0]?.message?.content || "{}";
-      const parsed = JSON.parse(raw);
-      const quizQuestions = parsed.questions || [];
+      const result = await model.generateContent(
+        `You are a study assistant that creates quiz questions. Based on the provided study material, generate 5 multiple-choice questions with 4 options each. Return ONLY a JSON array of objects. Each question has: "question" (string), "options" (array of 4 strings), "answer" (index 0-3 of correct option). Example: [{"question":"What is X?","options":["A","B","C","D"],"answer":0}]\n\n${combinedContent}`
+      );
+      const raw = result.response.text();
+      let quizQuestions;
+      try {
+        quizQuestions = JSON.parse(raw);
+      } catch {
+        const match = raw.match(/\[[\s\S]*\]/);
+        quizQuestions = match ? JSON.parse(match[0]) : [];
+      }
 
       return NextResponse.json({ ok: true, quizQuestions: Array.isArray(quizQuestions) ? quizQuestions : [] });
     }
