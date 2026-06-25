@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import {
-  Lock, Clock, Target, Flame, TrendingUp, Users, Calendar, MapPin, GraduationCap, Search, UserPlus, Loader2,
+  Lock, Clock, Target, Flame, TrendingUp, Users, Calendar, MapPin, GraduationCap, Search, UserPlus, Loader2, UserCheck, Bell,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -27,6 +27,9 @@ interface SearchResultUser {
   university: string;
   avatarUrl: string | null;
   isPrivate: boolean;
+  isFriend: boolean;
+  isFollowing: boolean;
+  hasPendingRequest: boolean;
 }
 
 const mockFriends: FriendUser[] = [
@@ -192,6 +195,7 @@ export default function FriendPage() {
   const [searchResults, setSearchResults] = useState<SearchResultUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null); // tracks which user ID is being processed
 
   // Current user's own stats
   const myStats = {
@@ -227,6 +231,45 @@ export default function FriendPage() {
     } finally {
       setSearching(false);
     }
+  };
+
+  // Connection actions (friend request, accept, follow, unfollow)
+  const handleConnection = async (action: string, targetUserId: string) => {
+    if (!user) return;
+    setActionLoading(targetUserId);
+    try {
+      await fetch("/api/user-connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          currentUserId: user.uid,
+          targetUserId,
+        }),
+      });
+
+      // Update local state to reflect the change
+      setSearchResults((prev) =>
+        prev.map((u) => {
+          if (u.id !== targetUserId) return u;
+          switch (action) {
+            case "send_request":
+              return { ...u, hasPendingRequest: true };
+            case "follow":
+              return { ...u, isFollowing: true };
+            case "unfollow":
+              return { ...u, isFollowing: false };
+            case "accept_request":
+              return { ...u, isFriend: true, hasPendingRequest: false, isFollowing: true };
+            case "reject_request":
+              return { ...u, hasPendingRequest: false };
+            default:
+              return u;
+          }
+        })
+      );
+    } catch {}
+    setActionLoading(null);
   };
 
   return (
@@ -371,26 +414,85 @@ export default function FriendPage() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink">{resultUser.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-ink">{resultUser.name}</p>
+                      {resultUser.isPrivate && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-ink-muted">
+                          <Lock className="h-2.5 w-2.5" /> Private
+                        </span>
+                      )}
+                    </div>
                     {resultUser.university && (
                       <p className="text-[11px] text-ink-muted">
                         <GraduationCap className="inline h-3 w-3 mr-0.5" />
                         {resultUser.university}
                       </p>
                     )}
-                    {resultUser.isPrivate && (
-                      <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-ink-muted">
-                        <Lock className="h-2.5 w-2.5" /> Private
+                    {resultUser.isFriend && (
+                      <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-moss">
+                        <UserCheck className="h-2.5 w-2.5" /> Friends
                       </span>
                     )}
                   </div>
-                  <button
-                    className="flex items-center gap-1 rounded-lg bg-moss/10 px-3 py-1.5 text-xs font-medium text-moss transition-colors hover:bg-moss/20"
-                    title="Send friend request"
-                  >
-                    <UserPlus className="h-3.5 w-3.5" />
-                    Add Friend
-                  </button>
+
+                  {/* Privacy-based connection buttons */}
+                  {resultUser.isFriend ? (
+                    // Already friends — show "Friends" badge
+                    <span className="flex items-center gap-1 rounded-lg bg-moss/10 px-3 py-1.5 text-xs font-medium text-moss">
+                      <UserCheck className="h-3.5 w-3.5" /> Friends
+                    </span>
+                  ) : actionLoading === resultUser.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+                  ) : resultUser.isPrivate ? (
+                    // PRIVATE account: only "Connect" (friend request)
+                    resultUser.hasPendingRequest ? (
+                      <span className="flex items-center gap-1 rounded-lg bg-gold/10 px-3 py-1.5 text-xs font-medium text-gold-dark">
+                        <Bell className="h-3.5 w-3.5" /> Request Sent
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleConnection("send_request", resultUser.id)}
+                        className="flex items-center gap-1 rounded-lg bg-moss px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-moss-dark"
+                        title="Send friend request"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> Connect
+                      </button>
+                    )
+                  ) : (
+                    // PUBLIC account: both "Connect" and "Following" buttons
+                    <div className="flex items-center gap-1.5">
+                      {resultUser.hasPendingRequest ? (
+                        <span className="flex items-center gap-1 rounded-lg bg-gold/10 px-2.5 py-1.5 text-[11px] font-medium text-gold-dark">
+                          <Bell className="h-3 w-3" /> Sent
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleConnection("send_request", resultUser.id)}
+                          className="flex items-center gap-1 rounded-lg bg-moss px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-moss-dark"
+                          title="Send friend request"
+                        >
+                          <UserPlus className="h-3 w-3" /> Connect
+                        </button>
+                      )}
+                      {resultUser.isFollowing ? (
+                        <button
+                          onClick={() => handleConnection("unfollow", resultUser.id)}
+                          className="flex items-center gap-1 rounded-lg border border-ivory-deep px-2.5 py-1.5 text-[11px] font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500 hover:border-red-200"
+                          title="Unfollow"
+                        >
+                          <UserCheck className="h-3 w-3" /> Following
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleConnection("follow", resultUser.id)}
+                          className="flex items-center gap-1 rounded-lg border border-moss/30 bg-moss/5 px-2.5 py-1.5 text-[11px] font-medium text-moss transition-colors hover:bg-moss/10"
+                          title="Follow"
+                        >
+                          <Users className="h-3 w-3" /> Follow
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}
