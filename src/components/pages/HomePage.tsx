@@ -200,26 +200,23 @@ export default function HomePage() {
 
   const monthLabel = isJp ? `${viewYear}年${viewMonth + 1}月` : `${monthsEn[viewMonth]} ${viewYear}`;
 
-  // All events for the vertical timeline (next 7 days, sorted by date+time)
+  // Events for today's vertical timeline (sorted by time)
   const timelineEvents = useMemo(() => {
     const result: { date: string; dateLabel: string; events: { time: string; title: string; endTime?: string; source: "local" | "google" }[] }[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      const key = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
-      const dayEvents = mergedEvents[key];
-      if (dayEvents && dayEvents.length > 0) {
-        result.push({
-          date: key,
-          dateLabel: d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }),
-          events: dayEvents.map(e => ({
-            time: e.time,
-            title: e.title,
-            endTime: e.source === "local" ? e.room : undefined,
-            source: e.source,
-          })),
-        });
-      }
+    const d = new Date();
+    const key = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+    const dayEvents = mergedEvents[key];
+    if (dayEvents && dayEvents.length > 0) {
+      result.push({
+        date: key,
+        dateLabel: d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }),
+        events: dayEvents.map(e => ({
+          time: e.time,
+          title: e.title,
+          endTime: e.source === "local" ? e.room : undefined,
+          source: e.source,
+        })),
+      });
     }
     return result;
   }, [mergedEvents]);
@@ -251,10 +248,10 @@ export default function HomePage() {
                     setNewEventDate(toISODate(viewYear, viewMonth, selectedDateKey ? parseInt(selectedDateKey.split("-")[2]) : today.getDate()));
                     setShowAddEvent(true);
                   }}
-                  className="flex items-center gap-1.5 rounded-lg bg-moss px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-moss-dark"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-moss text-white transition-colors hover:bg-moss-dark"
+                  title={isJp ? "追加" : "Add Event"}
                 >
-                  <Plus className="h-3 w-3" />
-                  {isJp ? "追加" : "Add Event"}
+                  <Plus className="h-4 w-4" />
                 </button>
                 {googleCal.isConfigured && (
                   googleCal.isConnected ? (
@@ -446,11 +443,11 @@ export default function HomePage() {
       {/* New Vertical Timeline Calendar — next 7 days */}
       <div className="rounded-2xl bg-white/80 p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
         <h2 className="mb-5 font-serif text-lg font-semibold text-ink">
-          {isJp ? "今後7日間のタイムライン" : "Upcoming Timeline (7 Days)"}
+          {isJp ? "今日のタイムライン" : "Today's Timeline"}
         </h2>
         {timelineEvents.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-muted">
-            {isJp ? "今後7日間の予定はありません。" : "No events in the next 7 days."}
+            {isJp ? "今日の予定はありません。" : "No events today."}
           </p>
         ) : (
           <div className="relative">
