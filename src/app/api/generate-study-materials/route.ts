@@ -3,7 +3,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
   try {
-    const { pdfText, noteContent, type } = await req.json();
+    const { pdfText, noteContent, type, count } = await req.json();
+    const itemCount = Math.max(1, Math.min(20, count || 5));
 
     if (!pdfText && !noteContent) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     if (type === "anki") {
       const result = await model.generateContent(
-        `You are a study assistant that creates Anki flashcards. Based on the provided study material, generate 5-10 high-quality Anki cards. Return ONLY a JSON array of objects with "front" and "back" fields. Example: [{"front":"What is X?","back":"X is..."}]\n\n${combinedContent}`
+        `You are a study assistant that creates Anki flashcards. Based on the provided study material, generate exactly ${itemCount} high-quality Anki cards. Return ONLY a JSON array of objects with "front" and "back" fields. Example: [{"front":"What is X?","back":"X is..."}]\n\n${combinedContent}`
       );
       const raw = result.response.text();
       let ankiCards;
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, ankiCards: Array.isArray(ankiCards) ? ankiCards : [] });
     } else {
       const result = await model.generateContent(
-        `You are a study assistant that creates quiz questions. Based on the provided study material, generate 5 multiple-choice questions with 4 options each. Return ONLY a JSON array of objects. Each question has: "question" (string), "options" (array of 4 strings), "answer" (index 0-3 of correct option). Example: [{"question":"What is X?","options":["A","B","C","D"],"answer":0}]\n\n${combinedContent}`
+        `You are a study assistant that creates quiz questions. Based on the provided study material, generate exactly ${itemCount} multiple-choice questions with 4 options each. Return ONLY a JSON array of objects. Each question has: "question" (string), "options" (array of 4 strings), "answer" (index 0-3 of correct option). Example: [{"question":"What is X?","options":["A","B","C","D"],"answer":0}]\n\n${combinedContent}`
       );
       const raw = result.response.text();
       let quizQuestions;

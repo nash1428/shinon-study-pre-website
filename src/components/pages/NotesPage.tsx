@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import {
   FileText, Plus, Upload, Layers, X, FileUp, HelpCircle,
-  AlignJustify, Columns2, Trash2, Mic, Loader2, ChevronDown, ChevronUp,
+  AlignJustify, Columns2, Trash2, Mic, Loader2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentNotes as initialNotes, type NoteItem, type AnkiCard, type QuizQuestion } from "@/lib/data";
@@ -27,6 +27,8 @@ export default function NotesPage() {
   const [audioSummarizing, setAudioSummarizing] = useState(false);
   const [generatingAnki, setGeneratingAnki] = useState(false);
   const [generatingQuiz, setGeneratingQuiz] = useState(false);
+  const [ankiCount, setAnkiCount] = useState(5);
+  const [quizCount, setQuizCount] = useState(5);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +65,10 @@ export default function NotesPage() {
     if (expandedNoteId === id) setExpandedNoteId(null);
   };
 
+  const handleToggleExpand = (id: number) => {
+    setExpandedNoteId(expandedNoteId === id ? null : id);
+  };
+
   // PDF upload handler
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,9 +80,6 @@ export default function NotesPage() {
     reader.onloadend = () => {
       const dataUrl = reader.result as string;
       setPdfData(dataUrl);
-      // Extract text from PDF for AI features (simple extraction via pdf.js is complex;
-      // we'll pass the note content as context and note that PDF text extraction
-      // works best with the AI API)
       setPdfText(`PDF: ${file.name} (${(file.size / 1024).toFixed(0)}KB)`);
     };
     reader.readAsDataURL(file);
@@ -97,7 +100,6 @@ export default function NotesPage() {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach((t) => t.stop());
 
-        // Send to API
         setAudioSummarizing(true);
         try {
           const reader = new FileReader();
@@ -142,7 +144,7 @@ export default function NotesPage() {
       const res = await fetch("/api/generate-study-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfText, noteContent: newBody, type: "anki" }),
+        body: JSON.stringify({ pdfText, noteContent: newBody, type: "anki", count: ankiCount }),
       });
       const data = await res.json();
       if (data.ankiCards && data.ankiCards.length > 0) {
@@ -169,7 +171,7 @@ export default function NotesPage() {
       const res = await fetch("/api/generate-study-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfText, noteContent: newBody, type: "quiz" }),
+        body: JSON.stringify({ pdfText, noteContent: newBody, type: "quiz", count: quizCount }),
       });
       const data = await res.json();
       if (data.quizQuestions && data.quizQuestions.length > 0) {
@@ -188,12 +190,6 @@ export default function NotesPage() {
     } catch {}
     setGeneratingQuiz(false);
   };
-
-  const toolButtons = [
-    { tag: "PDF", label: t("notes.importPdf"), icon: Upload, color: "bg-gold/30 hover:bg-gold/40" },
-    { tag: "Anki", label: t("notes.createAnki"), icon: Layers, color: "bg-gold/30 hover:bg-gold/40" },
-    { tag: "Quiz", label: "Quiz", icon: HelpCircle, color: "bg-gold/30 hover:bg-gold/40" },
-  ];
 
   return (
     <div className="page-enter">
@@ -225,6 +221,7 @@ export default function NotesPage() {
         {notes.map((note) => (
           <div
             key={note.id}
+            onClick={() => handleToggleExpand(note.id)}
             className={`group relative cursor-pointer rounded-2xl bg-white p-5 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-float)] ${
               note.fullWidth ? "sm:col-span-2 lg:col-span-3" : ""
             }`}
@@ -241,7 +238,7 @@ export default function NotesPage() {
               <Trash2 className="h-3.5 w-3.5" />
             </button>
 
-            <div className="flex items-start justify-between" onClick={() => setExpandedNoteId(expandedNoteId === note.id ? null : note.id)}>
+            <div className="flex items-start justify-between">
               <div className="flex-1 pr-8">
                 <h3 className="text-sm font-semibold text-ink">{note.title}</h3>
                 <p className="mt-1 text-xs text-ink-soft">
@@ -249,36 +246,6 @@ export default function NotesPage() {
                     ? "PDF lecture notes (click to view)"
                     : note.excerpt}
                 </p>
-              </div>
-              <div className="ml-3 flex items-center gap-1.5">
-                {note.fullWidth && (
-                  <span className="rounded-full bg-ivory-warm px-1.5 py-0.5 text-[9px] font-medium text-ink-muted">
-                    Wide
-                  </span>
-                )}
-                {note.ankiCards && (
-                  <span className="rounded-full bg-moss/5 px-1.5 py-0.5 text-[9px] font-medium text-moss">
-                    {note.ankiCards.length} cards
-                  </span>
-                )}
-                {note.quizQuestions && (
-                  <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-medium text-blue-500">
-                    {note.quizQuestions.length} Qs
-                  </span>
-                )}
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                    note.tag === "PDF"
-                      ? "bg-red-50 text-red-500"
-                      : note.tag === "Anki"
-                      ? "bg-moss/5 text-moss"
-                      : note.tag === "Quiz"
-                      ? "bg-blue-50 text-blue-500"
-                      : "bg-gold/10 text-gold-dark"
-                  }`}
-                >
-                  {note.tag}
-                </span>
               </div>
             </div>
 
@@ -338,9 +305,14 @@ export default function NotesPage() {
                   </div>
                 )}
 
-                {/* Full text content */}
-                {note.fullContent && !note.ankiCards && !note.quizQuestions && (
+                {/* Full text content — always show if available */}
+                {note.fullContent && (
                   <p className="whitespace-pre-wrap text-xs text-ink-soft">{note.fullContent}</p>
+                )}
+
+                {/* Fallback if no content at all */}
+                {!note.fullContent && !note.ankiCards && !note.quizQuestions && !note.pdfData && (
+                  <p className="text-xs text-ink-muted italic">This note has no additional content.</p>
                 )}
               </div>
             )}
@@ -402,28 +374,7 @@ export default function NotesPage() {
                 />
               </div>
 
-              {/* Create buttons (swapped — now above Note Content) */}
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-ink-muted">Create</label>
-                <div className="flex gap-2">
-                  {toolButtons.map((tool) => {
-                    const Icon = tool.icon;
-                    return (
-                      <button
-                        key={tool.tag}
-                        onClick={() => handleCreate(tool.tag)}
-                        disabled={!newTitle.trim()}
-                        className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium text-white shadow-[var(--shadow-soft)] transition-colors disabled:opacity-50 ${tool.color}`}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                        {tool.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Note content (swapped — now below Create) */}
+              {/* Note content */}
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-xs font-medium text-ink-muted">
                   <span>Note content</span>
@@ -483,23 +434,61 @@ export default function NotesPage() {
                 )}
               </div>
 
-              {/* AI generation buttons */}
-              <div className="flex gap-2">
+              {/* AI generation — Anki */}
+              <div className="rounded-xl border border-moss/20 bg-moss/5 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-moss" />
+                    <span className="text-xs font-medium text-ink">Generate Anki Cards (AI)</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[10px] text-ink-muted">Count:</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={ankiCount}
+                      onChange={(e) => setAnkiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
+                      className="w-12 rounded-md border border-ivory-deep bg-white px-1.5 py-1 text-xs text-ink focus:border-moss/30 focus:outline-none"
+                    />
+                  </div>
+                </div>
                 <button
                   onClick={handleGenerateAnki}
                   disabled={!newTitle.trim() || generatingAnki}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-moss/30 bg-moss/5 px-3 py-2 text-xs font-medium text-moss transition-colors hover:bg-moss/10 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-moss px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
                 >
                   {generatingAnki ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
-                  {generatingAnki ? "Generating..." : "Generate Anki (AI)"}
+                  {generatingAnki ? "Generating..." : `Generate ${ankiCount} Anki Cards`}
                 </button>
+              </div>
+
+              {/* AI generation — Quiz */}
+              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <HelpCircle className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="text-xs font-medium text-ink">Generate Quiz (AI)</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-[10px] text-ink-muted">Count:</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={quizCount}
+                      onChange={(e) => setQuizCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
+                      className="w-12 rounded-md border border-ivory-deep bg-white px-1.5 py-1 text-xs text-ink focus:border-blue-300 focus:outline-none"
+                    />
+                  </div>
+                </div>
                 <button
                   onClick={handleGenerateQuiz}
                   disabled={!newTitle.trim() || generatingQuiz}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-500 transition-colors hover:bg-blue-100 disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
                 >
                   {generatingQuiz ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <HelpCircle className="h-3.5 w-3.5" />}
-                  {generatingQuiz ? "Generating..." : "Generate Quiz (AI)"}
+                  {generatingQuiz ? "Generating..." : `Generate ${quizCount} Quiz Questions`}
                 </button>
               </div>
 
