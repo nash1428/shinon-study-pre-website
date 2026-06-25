@@ -1,21 +1,28 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Sparkles, ChevronLeft, ChevronRight, Clock, MapPin,
-  FileText, X, ChevronDown, ChevronUp, Calendar, Loader2, Unlink,
+  FileText, X, ChevronDown, ChevronUp, Calendar, Loader2, Unlink, Plus, Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/AuthContext";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import Kitsune from "@/components/Kitsune";
-import GardenScene from "@/components/GardenScene";
-import DailyCheckIn from "@/components/DailyCheckIn";
+
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const monthsEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const dayLabelsEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-const dayLabelsJp = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日"];
+const dayLabelsEn = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const dayLabelsJp = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日"];
+
+interface LocalEvent {
+  id: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  source: "local" | "google";
+}
 
 const placeholderEvents: Record<string, { time: string; title: string; room: string }[]> = {
   "2026-5-5": [{ time: "09:00 AM", title: "Data Structures", room: "Gates 100" }],
@@ -28,6 +35,10 @@ const placeholderEvents: Record<string, { time: string; title: string; room: str
 
 function dateKey(year: number, month: number, day: number) {
   return `${year}-${month}-${day}`;
+}
+
+function toISODate(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 export default function HomePage() {
@@ -49,6 +60,14 @@ export default function HomePage() {
   const [expandedLecture, setExpandedLecture] = useState<string | null>(null);
   const [lectureNotes, setLectureNotes] = useLocalStorage<Record<string, { pdfName: string | null; note: string }>>("studyspace_lecture_notes", {});
 
+  // Local events (separate from Google Calendar)
+  const [localEvents, setLocalEvents] = useLocalStorage<LocalEvent[]>("studyspace_local_events", []);
+  const [showAddEvent, setShowAddEvent] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDate, setNewEventDate] = useState(toISODate(today.getFullYear(), today.getMonth(), today.getDate()));
+  const [newEventStart, setNewEventStart] = useState("09:00");
+  const [newEventEnd, setNewEventEnd] = useState("10:00");
+
   useEffect(() => {
     if (googleCal.isConnected) googleCal.fetchForMonth(viewYear, viewMonth);
   }, [viewYear, viewMonth, googleCal.isConnected, googleCal.fetchForMonth]);
@@ -63,12 +82,25 @@ export default function HomePage() {
     return cells;
   }, [firstDayOfMonth, daysInMonth]);
 
+  // Build a map of local events by dateKey for the monthly calendar
+  const localEventsByDate = useMemo(() => {
+    const map: Record<string, LocalEvent[]> = {};
+    localEvents.forEach((evt) => {
+      const [y, m, d] = evt.date.split("-").map(Number);
+      const key = dateKey(y, m - 1, d);
+      if (!map[key]) map[key] = [];
+      map[key].push(evt);
+    });
+    return map;
+  }, [localEvents]);
+
+  // Merge Google Calendar + placeholder + local events
   const mergedEvents = useMemo(() => {
-    const merged: Record<string, { time: string; title: string; room: string }[]> = {};
+    const merged: Record<string, { time: string; title: string; room: string; source: "local" | "google" }[]> = {};
     if (!googleCal.isConnected) {
       Object.entries(placeholderEvents).forEach(([key, events]) => {
         if (!merged[key]) merged[key] = [];
-        merged[key].push(...events);
+        merged[key].push(...events.map(e => ({ ...e, source: "google" as const })));
       });
     }
     Object.entries(googleCal.eventsByDate).forEach(([key, events]) => {
@@ -78,11 +110,28 @@ export default function HomePage() {
           time: event.start ? new Date(event.start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "All day",
           title: event.title,
           room: event.location || "",
+          source: "google" as const,
         });
       });
     });
+    // Add local events
+    Object.entries(localEventsByDate).forEach(([key, events]) => {
+      if (!merged[key]) merged[key] = [];
+      events.forEach((evt) => {
+        merged[key].push({
+          time: evt.startTime,
+          title: evt.title,
+          room: `${evt.startTime}–${evt.endTime}`,
+          source: "local" as const,
+        });
+      });
+    });
+    // Sort each day's events by time
+    Object.keys(merged).forEach((key) => {
+      merged[key].sort((a, b) => a.time.localeCompare(b.time));
+    });
     return merged;
-  }, [googleCal.isConnected, googleCal.eventsByDate]);
+  }, [googleCal.isConnected, googleCal.eventsByDate, localEventsByDate]);
 
   const canGoPrev = useMemo(() => viewYear > minDate.getFullYear() || (viewYear === minDate.getFullYear() && viewMonth > minDate.getMonth()), [viewYear, viewMonth, minDate]);
   const canGoNext = useMemo(() => viewYear < maxDate.getFullYear() || (viewYear === maxDate.getFullYear() && viewMonth < maxDate.getMonth()), [viewYear, viewMonth, maxDate]);
@@ -101,6 +150,25 @@ export default function HomePage() {
   const handleLectureClick = (id: string) => setExpandedLecture(expandedLecture === id ? null : id);
   const updateLectureData = (id: string, data: Partial<{ pdfName: string | null; note: string }>) =>
     setLectureNotes((prev) => ({ ...prev, [id]: { ...prev[id], ...data } }));
+
+  const handleAddLocalEvent = () => {
+    if (!newEventTitle.trim()) return;
+    const newEvent: LocalEvent = {
+      id: `local-${Date.now()}`,
+      title: newEventTitle.trim(),
+      date: newEventDate,
+      startTime: newEventStart,
+      endTime: newEventEnd,
+      source: "local",
+    };
+    setLocalEvents([...localEvents, newEvent]);
+    setNewEventTitle("");
+    setShowAddEvent(false);
+  };
+
+  const handleDeleteLocalEvent = (id: string) => {
+    setLocalEvents(localEvents.filter((e) => e.id !== id));
+  };
 
   const weekDays = useMemo(() => {
     let refDay: number;
@@ -132,9 +200,29 @@ export default function HomePage() {
 
   const monthLabel = isJp ? `${viewYear}年${viewMonth + 1}月` : `${monthsEn[viewMonth]} ${viewYear}`;
 
-  // Garden stage based on focus sessions
-  const [focusCount] = useLocalStorage<number>("studyspace_focus_count", 0);
-  const gardenStage = Math.min(5, Math.floor(focusCount / 5) + 1);
+  // All events for the vertical timeline (next 7 days, sorted by date+time)
+  const timelineEvents = useMemo(() => {
+    const result: { date: string; dateLabel: string; events: { time: string; title: string; endTime?: string; source: "local" | "google" }[] }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const key = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+      const dayEvents = mergedEvents[key];
+      if (dayEvents && dayEvents.length > 0) {
+        result.push({
+          date: key,
+          dateLabel: d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }),
+          events: dayEvents.map(e => ({
+            time: e.time,
+            title: e.title,
+            endTime: e.source === "local" ? e.room : undefined,
+            source: e.source,
+          })),
+        });
+      }
+    }
+    return result;
+  }, [mergedEvents]);
 
   return (
     <div className="page-enter space-y-6">
@@ -149,12 +237,7 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Daily Check-in */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <DailyCheckIn />
-      </div>
-
-      {/* Calendar + Weekly Timeline (preserved) */}
+      {/* Calendar + Weekly Timeline */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Monthly Calendar */}
         <div className="lg:col-span-2">
@@ -162,6 +245,17 @@ export default function HomePage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-serif text-lg font-semibold text-ink">{monthLabel}</h2>
               <div className="flex items-center gap-2">
+                {/* Add local event button */}
+                <button
+                  onClick={() => {
+                    setNewEventDate(toISODate(viewYear, viewMonth, selectedDateKey ? parseInt(selectedDateKey.split("-")[2]) : today.getDate()));
+                    setShowAddEvent(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg bg-moss px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-moss-dark"
+                >
+                  <Plus className="h-3 w-3" />
+                  {isJp ? "追加" : "Add Event"}
+                </button>
                 {googleCal.isConfigured && (
                   googleCal.isConnected ? (
                     <button onClick={googleCal.disconnect} className="flex items-center gap-1.5 rounded-lg border border-ivory-deep px-2.5 py-1 text-[11px] font-medium text-stone hover:bg-maple/10 hover:text-maple transition-colors">
@@ -209,12 +303,12 @@ export default function HomePage() {
                 const isToday = key === todayKey;
                 const isSelected = key === selectedDateKey;
                 return (
-                  <button key={i} onClick={() => dayEvents && setSelectedDateKey(isSelected ? null : key)} disabled={!hasEvent}
+                  <button key={i} onClick={() => setSelectedDateKey(isSelected ? null : key)}
                     className={`relative flex aspect-square items-center justify-center rounded-lg text-sm transition-all ${
                       isSelected ? "bg-moss font-bold text-white shadow-[var(--shadow-soft)]"
                       : isToday ? "bg-moss/10 font-bold text-moss ring-1 ring-moss/30"
                       : hasEvent ? "bg-gold/5 font-medium text-moss hover:bg-gold/10 cursor-pointer"
-                      : "text-ink-muted"}`}>
+                      : "text-ink-muted hover:bg-ivory-warm/50"}`}>
                     {day}
                     {hasEvent && !isSelected && !isToday && <div className="absolute bottom-1 h-1 w-1 rounded-full bg-gold" />}
                   </button>
@@ -225,18 +319,31 @@ export default function HomePage() {
             {selectedDateKey && mergedEvents[selectedDateKey] && (
               <div className="mt-4 rounded-xl bg-gold/5 p-4 ring-1 ring-gold/20">
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-serif text-sm font-semibold text-moss">{monthsEn[viewMonth]} {parseInt(selectedDateKey.split("-")[2])}</h3>
+                  <h3 className="font-serif text-sm font-semibold text-moss">
+                    {monthsEn[parseInt(selectedDateKey.split("-")[1])]} {parseInt(selectedDateKey.split("-")[2])}
+                  </h3>
                   <button onClick={() => setSelectedDateKey(null)} className="text-gold hover:text-gold-dark"><X className="h-3.5 w-3.5" /></button>
                 </div>
                 <div className="space-y-2">
                   {mergedEvents[selectedDateKey].map((event, ei) => (
                     <div key={ei} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
-                      <div className="h-2 w-2 rounded-full bg-gold shrink-0" />
+                      <div className={`h-2 w-2 rounded-full shrink-0 ${event.source === "local" ? "bg-moss" : "bg-gold"}`} />
                       <div className="flex-1">
                         <p className="text-xs font-medium text-ink">{event.title}</p>
                         {event.room && <p className="text-[10px] text-ink-muted">{event.room}</p>}
                       </div>
                       <span className="text-[10px] text-ink-muted">{event.time}</span>
+                      {event.source === "local" && (
+                        <button
+                          onClick={() => {
+                            const localEvt = localEvents.find((e) => e.title === event.title && e.startTime === event.time);
+                            if (localEvt) handleDeleteLocalEvent(localEvt.id);
+                          }}
+                          className="text-ink-muted hover:text-red-500"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -246,11 +353,12 @@ export default function HomePage() {
             <div className="mt-4 flex items-center gap-4 border-t border-ivory-deep/40 pt-3">
               <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-moss" /><span className="text-[11px] text-ink-muted">{t("home.calendar.today")}</span></div>
               <div className="flex items-center gap-1.5"><div className="h-1 w-1 rounded-full bg-gold" /><span className="text-[11px] text-ink-muted">{t("home.calendar.hasEvents")}</span></div>
+              <div className="flex items-center gap-1.5"><div className="h-1 w-1 rounded-full bg-moss" /><span className="text-[11px] text-ink-muted">Local</span></div>
             </div>
           </div>
         </div>
 
-        {/* Weekly Timeline */}
+        {/* Weekly Timeline (Vertical Calendar) */}
         <div className="lg:col-span-3">
           <div className="rounded-2xl bg-white/80 p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
             <h2 className="mb-5 font-serif text-lg font-semibold text-ink">{t("home.week.title")}</h2>
@@ -284,7 +392,7 @@ export default function HomePage() {
                               <div key={ei}>
                                 <button onClick={() => { handleLectureClick(lectureId); setSelectedDateKey(dayInfo.key); }}
                                   className={`flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-all ${isExpanded ? "bg-moss/5 ring-1 ring-moss/20" : "bg-ivory-warm/50 hover:bg-ivory-warm"}`}>
-                                  <div className={`h-2 w-2 rounded-full shrink-0 ${ei % 2 === 0 ? "bg-moss" : "bg-gold"}`} />
+                                  <div className={`h-2 w-2 rounded-full shrink-0 ${event.source === "local" ? "bg-moss" : ei % 2 === 0 ? "bg-moss" : "bg-gold"}`} />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-ink truncate">{event.title}</p>
                                     <p className="text-[11px] text-ink-muted truncate">{event.time}{event.room ? ` · ${event.room}` : ""}</p>
@@ -334,6 +442,126 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* New Vertical Timeline Calendar — next 7 days */}
+      <div className="rounded-2xl bg-white/80 p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
+        <h2 className="mb-5 font-serif text-lg font-semibold text-ink">
+          {isJp ? "今後7日間のタイムライン" : "Upcoming Timeline (7 Days)"}
+        </h2>
+        {timelineEvents.length === 0 ? (
+          <p className="py-8 text-center text-sm text-ink-muted">
+            {isJp ? "今後7日間の予定はありません。" : "No events in the next 7 days."}
+          </p>
+        ) : (
+          <div className="relative">
+            {/* Vertical line */}
+            <div className="absolute left-[80px] top-2 bottom-2 w-0.5 bg-ivory-deep" />
+            <div className="space-y-6">
+              {timelineEvents.map((dayGroup) => (
+                <div key={dayGroup.date} className="flex gap-4">
+                  {/* Date label */}
+                  <div className="flex w-[68px] flex-col items-end pt-0.5">
+                    <span className="text-xs font-semibold text-ink">{dayGroup.dateLabel.split(",")[0]}</span>
+                    <span className="text-[10px] text-ink-muted">{dayGroup.dateLabel.split(",").slice(1).join(",").trim()}</span>
+                  </div>
+                  {/* Dot on timeline */}
+                  <div className="relative flex w-[16px] shrink-0 justify-center pt-1.5">
+                    <div className="h-3 w-3 rounded-full border-2 border-white bg-moss shadow-sm" />
+                  </div>
+                  {/* Events for this day */}
+                  <div className="flex-1 space-y-2 pb-1">
+                    {dayGroup.events.map((evt, ei) => (
+                      <div key={ei} className="flex items-center gap-3 rounded-xl bg-ivory-warm/40 px-4 py-3">
+                        <div className="flex flex-col items-center">
+                          <span className="text-xs font-bold text-moss">{evt.time}</span>
+                          {evt.endTime && <span className="text-[9px] text-ink-muted">{evt.endTime}</span>}
+                        </div>
+                        <div className="h-8 w-px bg-ivory-deep" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-ink">{evt.title}</p>
+                          <p className="text-[10px] text-ink-muted">
+                            {evt.source === "local" ? "📍 Local event" : "📅 Google Calendar"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Add Local Event Modal */}
+      {showAddEvent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4"
+          onClick={() => setShowAddEvent(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-[var(--shadow-float)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-ink">Add Event</h2>
+              <button onClick={() => setShowAddEvent(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">Event title</label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newEventTitle}
+                  onChange={(e) => setNewEventTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddLocalEvent()}
+                  placeholder="e.g., Study Group"
+                  className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink-muted">Date</label>
+                <input
+                  type="date"
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
+                  className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-2.5 text-sm text-ink focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+                />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-ink-muted">Start time</label>
+                  <input
+                    type="time"
+                    value={newEventStart}
+                    onChange={(e) => setNewEventStart(e.target.value)}
+                    className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-2.5 text-sm text-ink focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-medium text-ink-muted">End time</label>
+                  <input
+                    type="time"
+                    value={newEventEnd}
+                    onChange={(e) => setNewEventEnd(e.target.value)}
+                    className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-2.5 text-sm text-ink focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleAddLocalEvent}
+                disabled={!newEventTitle.trim()}
+                className="w-full rounded-xl bg-moss py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50"
+              >
+                Add Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
