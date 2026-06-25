@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, summary, transcript });
   } catch (err) {
     console.error("[audio-summarize] Failed:", err);
-    return NextResponse.json({ error: "Failed to process audio" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Failed to process audio";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     console.error("[generate-study-materials] Failed:", err);
-    return NextResponse.json({ error: "Failed to generate study materials" }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Failed to generate study materials";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
