@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { X, Send, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "bot";
@@ -150,7 +151,32 @@ export default function FloatingChatbot() {
                   {msg.role === "bot" && (
                     <span className="mb-0.5 block font-serif text-[10px] italic text-gold">Fox Sensei</span>
                   )}
-                  {msg.text}
+                  {msg.role === "bot" ? (
+                    <div className="prose-chat">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                          ul: ({ children }) => <ul className="mb-1 list-inside list-disc space-y-0.5">{children}</ul>,
+                          ol: ({ children }) => <ol className="mb-1 list-inside list-decimal space-y-0.5">{children}</ol>,
+                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          strong: ({ children }) => <strong className="font-semibold text-ink">{children}</strong>,
+                          em: ({ children }) => <em className="italic">{children}</em>,
+                          code: ({ children }) => <code className="rounded bg-ivory-warm px-1 py-0.5 text-[10px]">{children}</code>,
+                          h1: ({ children }) => <h3 className="mb-1 text-xs font-bold">{children}</h3>,
+                          h2: ({ children }) => <h4 className="mb-1 text-xs font-bold">{children}</h4>,
+                          h3: ({ children }) => <h5 className="mb-1 text-[11px] font-bold">{children}</h5>,
+                          blockquote: ({ children }) => <blockquote className="border-l-2 border-gold/30 pl-2 italic text-ink-soft">{children}</blockquote>,
+                          table: ({ children }) => <table className="mb-1 border-collapse text-[10px]">{children}</table>,
+                          th: ({ children }) => <th className="border border-ivory-deep px-1.5 py-0.5 font-semibold">{children}</th>,
+                          td: ({ children }) => <td className="border border-ivory-deep px-1.5 py-0.5">{children}</td>,
+                        }}
+                      >
+                        {msg.text}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    msg.text
+                  )}
                 </div>
               </div>
             ))}
