@@ -62,20 +62,62 @@ const defaultProfile: UserProfile = {
 // In-memory cache
 const profileCache = new Map<string, UserProfile>();
 
+/**
+ * Save profile to Firestore via server-side API route (uses user's ID token).
+ * This bypasses client-side SDK issues and works with proper security rules.
+ */
+async function saveProfileToServer(idToken: string, uid: string, profile: UserProfile): Promise<void> {
+  try {
+    await fetch("/api/save-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken, uid, profile }),
+    });
+  } catch (err) {
+    console.error("Server profile save failed:", err);
+  }
+}
+
+/**
+ * Fetch profile from Firestore via server-side API route (uses user's ID token).
+ */
+async function fetchProfileFromServer(idToken: string, uid: string): Promise<UserProfile | null> {
+  try {
+    const res = await fetch("/api/get-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken, uid }),
+    });
+    const data = await res.json();
+    if (data.ok && data.profile) {
+      return data.profile as UserProfile;
+    }
+  } catch (err) {
+    console.error("Server profile fetch failed:", err);
+  }
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch profile in background — never blocks UI
-  const fetchProfileInBackground = useCallback(async (uid: string, fallback: Partial<UserProfile>) => {
+  const fetchProfileInBackground = useCallback(async (firebaseUser: FirebaseUser) => {
+    const uid = firebaseUser.uid;
+    const fallback: Partial<UserProfile> = {
+      email: firebaseUser.email || "",
+      name: firebaseUser.displayName || "",
+    };
+
     // 1. Check in-memory cache (instant) — only for this user
     if (profileCache.has(uid)) {
       setProfile(profileCache.get(uid)!);
       return;
     }
 
-    // 2. Check localStorage backup (per-user key to avoid cross-account mixing)
+    // 2. Check per-user localStorage key
     let localProfile: UserProfile | null = null;
     try {
       const backup = localStorage.getItem(`studyspace_profile_${uid}`);
@@ -86,37 +128,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    // 3. If no local profile, set a temp one from auth data so UI renders immediately
+    // 3. If no per-user profile, try migrating from old shared key
+    if (!localProfile) {
+      try {
+        const oldBackup = localStorage.getItem("studyspace_profile_backup");
+        if (oldBackup) {
+          const oldProfile = JSON.parse(oldBackup) as UserProfile;
+          // Only use old data if the email matches the current user
+          if (oldProfile.email === firebaseUser.email) {
+            localProfile = oldProfile;
+            profileCache.set(uid, localProfile);
+            setProfile(localProfile);
+            // Save to new per-user key
+            localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(localProfile));
+            // Don't delete the old key yet — keep as backup
+          }
+        }
+      } catch {}
+    }
+
+    // 4. If still no profile, set a temp one from auth data so UI renders immediately
     if (!localProfile) {
       const tempProfile = { ...defaultProfile, ...fallback } as UserProfile;
       setProfile(tempProfile);
     }
 
-    // 4. Fetch from Firestore in background (non-blocking)
-    if (!db) return;
-
+    // 5. Try fetching from Firestore via server API (uses ID token for auth)
     try {
-      const docRef = doc(db, "users", uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const fetched = docSnap.data() as UserProfile;
-        profileCache.set(uid, fetched);
-        setProfile(fetched);
+      const idToken = await firebaseUser.getIdToken();
+      const serverProfile = await fetchProfileFromServer(idToken, uid);
+      if (serverProfile) {
+        profileCache.set(uid, serverProfile);
+        setProfile(serverProfile);
         try {
-          localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(fetched));
-        } catch {}
-      } else {
-        const newProfile = { ...defaultProfile, ...fallback } as UserProfile;
-        await setDoc(docRef, newProfile);
-        profileCache.set(uid, newProfile);
-        setProfile(newProfile);
-        try {
-          localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(newProfile));
+          localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(serverProfile));
         } catch {}
       }
-    } catch (err) {
-      console.error("Profile fetch failed:", err);
-      // Keep whatever we have from localStorage or temp — app still works
+    } catch {
+      // Server fetch failed — keep whatever we have from localStorage or temp
+    }
+
+    // 6. Also try Firestore via client SDK as a secondary fallback
+    if (db) {
+      try {
+        const docRef = doc(db, "users", uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const fetched = docSnap.data() as UserProfile;
+          profileCache.set(uid, fetched);
+          setProfile(fetched);
+          try {
+            localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(fetched));
+          } catch {}
+        }
+      } catch {
+        // Firestore client SDK failed (likely security rules) — keep existing profile
+      }
     }
   }, []);
 
@@ -136,10 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set loading=false IMMEDIATELY — don't wait for anything else
         setLoading(false);
         // Fetch profile in background (non-blocking)
-        fetchProfileInBackground(firebaseUser.uid, {
-          email: firebaseUser.email || "",
-          name: firebaseUser.displayName || "",
-        });
+        fetchProfileInBackground(firebaseUser);
       } else {
         setProfile(null);
         setLoading(false);
@@ -162,10 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Optimistically set user + loading=false so the redirect is instant
     setUser(cred.user);
     setLoading(false);
-    fetchProfileInBackground(cred.user.uid, {
-      email: cred.user.email || "",
-      name: cred.user.displayName || "",
-    });
+    fetchProfileInBackground(cred.user);
 
     return cred.user;
   }, [fetchProfileInBackground]);
@@ -178,16 +239,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // updateProfile — non-blocking (don't let it hang the UI)
       updateProfile(cred.user, { displayName: name }).catch(() => {});
 
+      const newProfile: UserProfile = { ...defaultProfile, email, name };
+      profileCache.set(cred.user.uid, newProfile);
+      try {
+        localStorage.setItem(`studyspace_profile_${cred.user.uid}`, JSON.stringify(newProfile));
+      } catch {}
+
+      // Save to Firestore via server API
+      try {
+        const idToken = await cred.user.getIdToken();
+        saveProfileToServer(idToken, cred.user.uid, newProfile);
+      } catch {}
+
+      // Also try client SDK
       if (db) {
-        const newProfile: UserProfile = { ...defaultProfile, email, name };
-        profileCache.set(cred.user.uid, newProfile);
-        try {
-          localStorage.setItem(`studyspace_profile_${cred.user.uid}`, JSON.stringify(newProfile));
-        } catch {}
-        // Fire and forget — same pattern as saveProfile
-        setDoc(doc(db, "users", cred.user.uid), newProfile).catch((err) => {
-          console.error("Firestore save failed (localStorage backup used):", err);
-        });
+        setDoc(doc(db, "users", cred.user.uid), newProfile).catch(() => {});
       }
     }
 
@@ -204,10 +270,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setLoading(true);
-    // Clean up old shared key if it exists (migration)
-    try {
-      localStorage.removeItem("studyspace_profile_backup");
-    } catch {}
     await signOut(auth);
   }, []);
 
@@ -227,12 +289,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentUser) {
       profileCache.set(currentUser.uid, updatedProfile);
 
-      // Fire Firestore write in background — DON'T await
-      // (avoids hanging on blocked Firestore security rules)
+      // Save to Firestore via server API (uses ID token for auth)
+      try {
+        const idToken = await currentUser.getIdToken();
+        saveProfileToServer(idToken, currentUser.uid, updatedProfile);
+      } catch {}
+
+      // Also try client SDK as backup
       if (db) {
-        setDoc(doc(db, "users", currentUser.uid), updatedProfile).catch((err) => {
-          console.error("Firestore save failed (localStorage backup used):", err);
-        });
+        setDoc(doc(db, "users", currentUser.uid), updatedProfile).catch(() => {});
       }
     }
   }, []);
