@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
 const FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/study-space-aeb52/databases/(default)/documents";
 
@@ -20,33 +21,52 @@ interface RegisteredUser {
 const userRegistry = new Map<string, RegisteredUser>();
 
 /**
- * Fetch all user documents from Firestore via REST API (uses ID token).
+ * Fetch all user documents from Firestore via Admin SDK (bypasses security rules).
  */
 async function fetchAllUsersFromFirestore(idToken: string): Promise<RegisteredUser[]> {
-  try {
-    // Use runQuery to list all documents in the 'users' collection
-    const res = await fetch(`${FIRESTORE_BASE}/users`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${idToken}` },
-    });
-
-    if (!res.ok) {
-      console.warn("[register-user] Firestore list failed:", res.status);
-      return [];
+  // Try Admin SDK first (bypasses security rules)
+  if (adminDb) {
+    try {
+      const snapshot = await adminDb.collection("users").limit(50).get();
+      return snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: data.name || "",
+          email: data.email || "",
+          university: data.university || "",
+          avatarUrl: data.avatarUrl || null,
+          isPrivate: data.isPrivate || false,
+          followers: data.followers || [],
+          following: data.following || [],
+          friends: data.friends || [],
+          friendRequests: data.friendRequests || [],
+          registeredAt: data.registeredAt || data.updatedAt || "",
+        } as RegisteredUser;
+      });
+    } catch (err) {
+      console.warn("[register-user] Admin SDK fetch failed, trying REST API");
     }
-
-    const data = await res.json();
-    const docs = data.documents || [];
-
-    return docs.map((doc: { name: string; fields: Record<string, unknown> }) => {
-      const fields = doc.fields || {};
-      const id = doc.name.split("/").pop() || "";
-      return parseFirestoreUser(id, fields);
-    });
-  } catch (err) {
-    console.warn("[register-user] Firestore list error:", err);
-    return [];
   }
+
+  // Fallback: Firestore REST API with ID token
+  if (idToken) {
+    try {
+      const res = await fetch(`${FIRESTORE_BASE}/users`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${idToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const docs = data.documents || [];
+        return docs.map((doc: { name: string; fields: Record<string, unknown> }) => {
+          return parseFirestoreUser(doc.name.split("/").pop() || "", doc.fields || {});
+        });
+      }
+    } catch {}
+  }
+
+  return [];
 }
 
 function parseFirestoreUser(id: string, fields: Record<string, unknown>): RegisteredUser {
@@ -179,19 +199,53 @@ export async function POST(req: NextRequest) {
     // Save to in-memory registry
     userRegistry.set(userId, userEntry);
 
-    // Save to Firestore via REST API (uses ID token for auth)
-    try {
-      const fields = toFirestoreFields(userEntry);
-      await fetch(`${FIRESTORE_BASE}/users/${userId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ fields }),
-      });
-    } catch (err) {
-      console.warn("[register-user] Firestore REST write failed:", err);
+    // Save to Firestore via Admin SDK (bypasses security rules)
+    if (adminDb) {
+      try {
+        await adminDb.collection("users").doc(userId).set({
+          id: userId,
+          name: userEntry.name,
+          email: userEntry.email,
+          university: userEntry.university,
+          avatarUrl: userEntry.avatarUrl,
+          isPrivate: userEntry.isPrivate,
+          followers: userEntry.followers,
+          following: userEntry.following,
+          friends: userEntry.friends,
+          friendRequests: userEntry.friendRequests,
+          registeredAt: userEntry.registeredAt,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (err) {
+        console.warn("[register-user] Admin SDK write failed:", err);
+        // Fallback to REST API
+        try {
+          const fields = toFirestoreFields(userEntry);
+          await fetch(`${FIRESTORE_BASE}/users/${userId}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ fields }),
+          });
+        } catch {}
+      }
+    } else {
+      // Fallback: REST API with ID token
+      try {
+        const fields = toFirestoreFields(userEntry);
+        await fetch(`${FIRESTORE_BASE}/users/${userId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ fields }),
+        });
+      } catch (err) {
+        console.warn("[register-user] REST API write also failed:", err);
+      }
     }
 
     return NextResponse.json({ ok: true, user: { id: userId, name: userEntry.name } });
