@@ -29,7 +29,7 @@ export default function FloatingChatbot() {
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: "bot", text: "Welcome to your study garden. How may I guide you today?" },
+    { role: "bot", text: "Welcome to your study garden. I'm Fox Sensei — I can see your notes, tasks, and schedule. Ask me anything!" },
   ]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +39,55 @@ export default function FloatingChatbot() {
     }
   }, [messages]);
 
+  // Build context from localStorage so Fox Sensei can answer data questions
+  const buildAppContext = () => {
+    try {
+      const context: Record<string, unknown> = {};
+
+      // Notes
+      const notesRaw = localStorage.getItem("studyspace_notes");
+      if (notesRaw) {
+        const notes = JSON.parse(notesRaw);
+        context.notes = notes.map((n: { title: string; tag: string; excerpt: string; date: string; fullContent?: string }) => ({
+          title: n.title,
+          tag: n.tag,
+          excerpt: n.excerpt,
+          date: n.date,
+          content: n.fullContent,
+        }));
+      }
+
+      // Tasks
+      const tasksRaw = localStorage.getItem("studyspace_tasks_all");
+      if (tasksRaw) {
+        const tasks = JSON.parse(tasksRaw);
+        context.tasks = tasks.map((t: { title: string; content?: string; deadline?: string; done: boolean }) => ({
+          title: t.title,
+          content: t.content,
+          deadline: t.deadline,
+          done: t.done,
+        }));
+      }
+
+      // Events
+      const eventsRaw = localStorage.getItem("studyspace_local_events");
+      if (eventsRaw) {
+        const events = JSON.parse(eventsRaw);
+        context.events = events.map((e: { title: string; date: string; startTime: string; endTime: string; location: string }) => ({
+          title: e.title,
+          date: e.date,
+          startTime: e.startTime,
+          endTime: e.endTime,
+          location: e.location,
+        }));
+      }
+
+      return context;
+    } catch {
+      return {};
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isThinking) return;
     const userMsg = input.trim();
@@ -47,10 +96,14 @@ export default function FloatingChatbot() {
     setIsThinking(true);
 
     try {
+      const context = buildAppContext();
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...messages, { role: "user", text: userMsg }] }),
+        body: JSON.stringify({
+          messages: [...messages, { role: "user", text: userMsg }],
+          context,
+        }),
       });
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "bot", text: data.reply || "I'm here. Tell me more." }]);
