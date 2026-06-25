@@ -1,125 +1,135 @@
 import { NextRequest, NextResponse } from "next/server";
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { userRegistry, type RegisteredUser } from "../register-user/route";
+import { userRegistry, type RegisteredUser, parseFirestoreUser, toFirestoreFields, FIRESTORE_BASE } from "../register-user/route";
 
 type ActionType = "send_request" | "accept_request" | "reject_request" | "follow" | "unfollow";
 
+async function fetchUserFromFirestore(idToken: string, uid: string): Promise<RegisteredUser | null> {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE}/users/${uid}`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${idToken}` },
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    const data = await res.json();
+    return parseFirestoreUser(uid, data.fields || {});
+  } catch {
+    return null;
+  }
+}
+
+async function saveUserToFirestore(idToken: string, user: RegisteredUser): Promise<boolean> {
+  try {
+    const fields = toFirestoreFields(user);
+    const res = await fetch(`${FIRESTORE_BASE}/users/${user.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ fields }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { action, currentUserId, targetUserId } = await req.json();
+    const { action, currentUserId, targetUserId, idToken } = await req.json();
 
     if (!action || !currentUserId || !targetUserId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Try Firestore first
-    let usedFirestore = false;
-    if (db) {
-      try {
-        const currentUserRef = doc(db, "users", currentUserId);
-        const targetUserRef = doc(db, "users", targetUserId);
-        const targetDoc = await getDoc(targetUserRef);
-        if (targetDoc.exists()) {
-          usedFirestore = true;
-          const targetData = targetDoc.data();
-          const isPrivate = targetData.isPrivate || false;
+    // Fetch both users from Firestore (or in-memory fallback)
+    let currentUser: RegisteredUser | null = null;
+    let targetUser: RegisteredUser | null = null;
 
-          switch (action as ActionType) {
-            case "send_request": {
-              await updateDoc(targetUserRef, { friendRequests: arrayUnion(currentUserId) });
-              return NextResponse.json({ ok: true, message: "Friend request sent" });
-            }
-            case "accept_request": {
-              await updateDoc(currentUserRef, {
-                friendRequests: arrayRemove(targetUserId),
-                friends: arrayUnion(targetUserId),
-                followers: arrayUnion(targetUserId),
-                following: arrayUnion(targetUserId),
-              });
-              await updateDoc(targetUserRef, {
-                friends: arrayUnion(currentUserId),
-                followers: arrayUnion(currentUserId),
-                following: arrayUnion(currentUserId),
-              });
-              return NextResponse.json({ ok: true, message: "Friend request accepted" });
-            }
-            case "reject_request": {
-              await updateDoc(currentUserRef, { friendRequests: arrayRemove(targetUserId) });
-              return NextResponse.json({ ok: true, message: "Friend request rejected" });
-            }
-            case "follow": {
-              if (isPrivate) {
-                return NextResponse.json({ error: "Cannot follow private account" }, { status: 403 });
-              }
-              await updateDoc(currentUserRef, { following: arrayUnion(targetUserId) });
-              await updateDoc(targetUserRef, { followers: arrayUnion(currentUserId) });
-              return NextResponse.json({ ok: true, message: "Now following" });
-            }
-            case "unfollow": {
-              await updateDoc(currentUserRef, { following: arrayRemove(targetUserId) });
-              await updateDoc(targetUserRef, { followers: arrayRemove(currentUserId) });
-              return NextResponse.json({ ok: true, message: "Unfollowed" });
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("[user-connections] Firestore failed, using in-memory registry");
-      }
+    if (idToken) {
+      currentUser = await fetchUserFromFirestore(idToken, currentUserId);
+      targetUser = await fetchUserFromFirestore(idToken, targetUserId);
     }
 
-    // Fallback: use in-memory registry
-    const currentUser = userRegistry.get(currentUserId);
-    const targetUser = userRegistry.get(targetUserId);
+    // Fallback to in-memory registry
+    if (!currentUser) currentUser = userRegistry.get(currentUserId) || null;
+    if (!targetUser) targetUser = userRegistry.get(targetUserId) || null;
 
     if (!targetUser) {
       return NextResponse.json({ error: "Target user not found" }, { status: 404 });
     }
 
-    // Ensure current user exists in registry
+    // Ensure current user exists
     if (!currentUser) {
-      userRegistry.set(currentUserId, {
+      currentUser = {
         id: currentUserId, name: "User", email: "", university: "",
         avatarUrl: null, isPrivate: false, followers: [], following: [],
         friends: [], friendRequests: [], registeredAt: new Date().toISOString(),
-      });
+      };
     }
-    const current = userRegistry.get(currentUserId)!;
 
     switch (action as ActionType) {
       case "send_request": {
         if (!targetUser.friendRequests.includes(currentUserId)) {
           targetUser.friendRequests.push(currentUserId);
+          userRegistry.set(targetUser.id, targetUser);
+          if (idToken) await saveUserToFirestore(idToken, targetUser);
         }
         return NextResponse.json({ ok: true, message: "Friend request sent" });
       }
+
       case "accept_request": {
-        current.friendRequests = current.friendRequests.filter((id) => id !== targetUserId);
-        if (!current.friends.includes(targetUserId)) current.friends.push(targetUserId);
-        if (!current.followers.includes(targetUserId)) current.followers.push(targetUserId);
-        if (!current.following.includes(targetUserId)) current.following.push(targetUserId);
+        currentUser.friendRequests = currentUser.friendRequests.filter((id) => id !== targetUserId);
+        if (!currentUser.friends.includes(targetUserId)) currentUser.friends.push(targetUserId);
+        if (!currentUser.followers.includes(targetUserId)) currentUser.followers.push(targetUserId);
+        if (!currentUser.following.includes(targetUserId)) currentUser.following.push(targetUserId);
         if (!targetUser.friends.includes(currentUserId)) targetUser.friends.push(currentUserId);
         if (!targetUser.followers.includes(currentUserId)) targetUser.followers.push(currentUserId);
         if (!targetUser.following.includes(currentUserId)) targetUser.following.push(currentUserId);
+        userRegistry.set(currentUser.id, currentUser);
+        userRegistry.set(targetUser.id, targetUser);
+        if (idToken) {
+          await saveUserToFirestore(idToken, currentUser);
+          await saveUserToFirestore(idToken, targetUser);
+        }
         return NextResponse.json({ ok: true, message: "Friend request accepted" });
       }
+
       case "reject_request": {
-        current.friendRequests = current.friendRequests.filter((id) => id !== targetUserId);
+        currentUser.friendRequests = currentUser.friendRequests.filter((id) => id !== targetUserId);
+        userRegistry.set(currentUser.id, currentUser);
+        if (idToken) await saveUserToFirestore(idToken, currentUser);
         return NextResponse.json({ ok: true, message: "Friend request rejected" });
       }
+
       case "follow": {
         if (targetUser.isPrivate) {
           return NextResponse.json({ error: "Cannot follow private account — send a friend request instead" }, { status: 403 });
         }
-        if (!current.following.includes(targetUserId)) current.following.push(targetUserId);
+        if (!currentUser.following.includes(targetUserId)) currentUser.following.push(targetUserId);
         if (!targetUser.followers.includes(currentUserId)) targetUser.followers.push(currentUserId);
+        userRegistry.set(currentUser.id, currentUser);
+        userRegistry.set(targetUser.id, targetUser);
+        if (idToken) {
+          await saveUserToFirestore(idToken, currentUser);
+          await saveUserToFirestore(idToken, targetUser);
+        }
         return NextResponse.json({ ok: true, message: "Now following" });
       }
+
       case "unfollow": {
-        current.following = current.following.filter((id) => id !== targetUserId);
+        currentUser.following = currentUser.following.filter((id) => id !== targetUserId);
         targetUser.followers = targetUser.followers.filter((id) => id !== currentUserId);
+        userRegistry.set(currentUser.id, currentUser);
+        userRegistry.set(targetUser.id, targetUser);
+        if (idToken) {
+          await saveUserToFirestore(idToken, currentUser);
+          await saveUserToFirestore(idToken, targetUser);
+        }
         return NextResponse.json({ ok: true, message: "Unfollowed" });
       }
+
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }

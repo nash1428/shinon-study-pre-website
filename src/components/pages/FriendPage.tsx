@@ -232,12 +232,17 @@ export default function FriendPage() {
     setSearching(true);
     setHasSearched(true);
     try {
+      let idToken = "";
+      if (user) {
+        idToken = await user.getIdToken();
+      }
       const res = await fetch("/api/search-users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           searchTerm: searchQuery.trim(),
           currentUserId: user?.uid || "currentUser",
+          idToken,
         }),
       });
       const data = await res.json();
@@ -258,6 +263,7 @@ export default function FriendPage() {
     if (!user) return;
     setActionLoading(targetUserId);
     try {
+      const idToken = await user.getIdToken();
       await fetch("/api/user-connections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -265,6 +271,7 @@ export default function FriendPage() {
           action,
           currentUserId: user.uid,
           targetUserId,
+          idToken,
         }),
       });
 
