@@ -12,6 +12,7 @@ const resources = {
       "sidebar.notes": "Notes",
       "sidebar.tasks": "Task Tracker",
       "sidebar.search": "Search",
+      "sidebar.friend": "Friend",
 
       // Profile section
       "profile.name": "Name",
@@ -105,6 +106,7 @@ const resources = {
       "sidebar.notes": "ノート",
       "sidebar.tasks": "タスク",
       "sidebar.search": "検索",
+      "sidebar.friend": "フレンド",
 
       // Profile section
       "profile.name": "名前",

@@ -2,14 +2,14 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Home, NotebookPen, ListChecks, Search,
+  Home, NotebookPen, ListChecks, Search, Users,
   ChevronUp, X, Check, Camera, Trash2,
   PanelLeftClose, PanelLeftOpen, LogOut, Loader2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuth, type UserProfile } from "@/lib/AuthContext";
 
-export type TabId = "home" | "notes" | "tasks" | "search";
+export type TabId = "home" | "notes" | "tasks" | "search" | "friend";
 
 interface SidebarProps {
   activeTab: TabId;
@@ -23,6 +23,7 @@ const navItems: { id: TabId; labelKey: string; icon: typeof Home }[] = [
   { id: "home", labelKey: "sidebar.home", icon: Home },
   { id: "notes", labelKey: "sidebar.notes", icon: NotebookPen },
   { id: "tasks", labelKey: "sidebar.tasks", icon: ListChecks },
+  { id: "friend", labelKey: "sidebar.friend", icon: Users },
   { id: "search", labelKey: "sidebar.search", icon: Search },
 ];
 

@@ -11,9 +11,7 @@ import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import Kitsune from "@/components/Kitsune";
 import GardenScene from "@/components/GardenScene";
-import FocusTimer from "@/components/FocusTimer";
 import DailyCheckIn from "@/components/DailyCheckIn";
-
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const monthsEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const dayLabelsEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -151,9 +149,8 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Three-column: Focus Timer + Check-in */}
+      {/* Daily Check-in */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <FocusTimer />
         <DailyCheckIn />
       </div>
 

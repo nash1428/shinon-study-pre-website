@@ -12,6 +12,7 @@ import HomePage from "@/components/pages/HomePage";
 import NotesPage from "@/components/pages/NotesPage";
 import TasksPage from "@/components/pages/TasksPage";
 import SearchPage from "@/components/pages/SearchPage";
+import FriendPage from "@/components/pages/FriendPage";
 
 function ProtectedApp() {
   const { user, loading, profile } = useAuth();
@@ -51,6 +52,8 @@ function ProtectedApp() {
         return <TasksPage />;
       case "search":
         return <SearchPage />;
+      case "friend":
+        return <FriendPage />;
     }
   };
 

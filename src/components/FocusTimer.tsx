@@ -40,6 +40,7 @@ export default function FocusTimer() {
   const [isBreak, setIsBreak] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(FOCUS_DURATION);
   const [completedSessions, setCompletedSessions] = useLocalStorage<number>("studyspace_focus_count", 0);
+  const [totalMinutes, setTotalMinutes] = useLocalStorage<number>("studyspace_focus_minutes", 0);
   const [kitsuneMessage, setKitsuneMessage] = useState("");
   const [showMessage, setShowMessage] = useState(false);
   const [ambientOn, setAmbientOn] = useState(false);
@@ -53,6 +54,7 @@ export default function FocusTimer() {
           if (!isBreak) {
             const newCount = completedSessions + 1;
             setCompletedSessions(newCount);
+            setTotalMinutes(totalMinutes + Math.round(FOCUS_DURATION / 60));
             const messages = newCount >= 3 ? longSessionMessages : completeMessages;
             setKitsuneMessage(messages[Math.floor(Math.random() * messages.length)]);
           } else {
@@ -67,7 +69,7 @@ export default function FocusTimer() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning, isBreak, completedSessions, setCompletedSessions]);
+  }, [isRunning, isBreak, completedSessions, setCompletedSessions, totalMinutes, setTotalMinutes]);
 
   const handleStart = () => {
     if (!isRunning && secondsLeft === FOCUS_DURATION) {
