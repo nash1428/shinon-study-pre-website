@@ -50,11 +50,18 @@ export type QuizQuestion = {
   answer: number;
 };
 
+export type CourseTab = {
+  tabId: string;
+  courseName: string;
+  content: string;
+};
+
 export type NoteItem = {
   id: number;
   title: string;
   date: string;
   tag: string;
+  category: string;
   excerpt: string;
   fullContent?: string;
   fullWidth?: boolean;
@@ -62,6 +69,7 @@ export type NoteItem = {
   pdfName?: string;
   ankiCards?: AnkiCard[];
   quizQuestions?: QuizQuestion[];
+  courseTabs?: CourseTab[];
 };
 
 export const recentNotes: NoteItem[] = [
@@ -70,6 +78,7 @@ export const recentNotes: NoteItem[] = [
     title: "Graph Traversal Algorithms",
     date: "Jun 21",
     tag: "PDF",
+    category: "Computer Science",
     excerpt: "BFS, DFS, Dijkstra's shortest path...",
   },
   {
@@ -77,6 +86,7 @@ export const recentNotes: NoteItem[] = [
     title: "GDP & Inflation",
     date: "Jun 20",
     tag: "Anki",
+    category: "Finance",
     excerpt: "CPI, real vs nominal GDP, fiscal policy...",
   },
   {
@@ -84,6 +94,7 @@ export const recentNotes: NoteItem[] = [
     title: "Eigenvalues & Eigenvectors",
     date: "Jun 19",
     tag: "PDF",
+    category: "Mathematics",
     excerpt: "Characteristic polynomial, diagonalization...",
   },
   {
@@ -91,6 +102,7 @@ export const recentNotes: NoteItem[] = [
     title: "Genki Lesson 8 — Kanji",
     date: "Jun 18",
     tag: "Anki",
+    category: "Japanese",
     excerpt: "読む, 書く, 勉強, 練習...",
   },
 ];
