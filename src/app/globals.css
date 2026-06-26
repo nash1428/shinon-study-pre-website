@@ -101,6 +101,26 @@ h1, h2, h3, .font-serif {
 
 .page-enter { animation: fade-in 0.3s ease-out; }
 
+/* ====== Flashcard 3D flip ====== */
+.flashcard-container { perspective: 1000px; }
+.flashcard-inner {
+  position: relative;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+.flashcard-inner.flipped { transform: rotateY(180deg); }
+.flashcard-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.flashcard-back { transform: rotateY(180deg); }
+
 @keyframes sidebar-expand {
   from { opacity: 0; max-height: 0; transform: translateY(-8px); }
   to { opacity: 1; max-height: 80vh; transform: translateY(0); }

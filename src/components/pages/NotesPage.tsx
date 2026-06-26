@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import {
   FileText, Plus, Upload, Layers, X, FileUp, HelpCircle,
-  AlignJustify, Columns2, Trash2, Mic, Loader2, ListPlus, ChevronLeft, Pencil, Check, Settings2,
+  AlignJustify, Columns2, Trash2, Mic, Loader2, ListPlus, ChevronLeft, ChevronRight, Pencil, Check, Settings2,
   Video, Play, Link2, File,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -47,6 +47,16 @@ export default function NotesPage() {
 
   // Full-width editor mode
   const [fullWidthEditor, setFullWidthEditor] = useState(false);
+
+  // Edit mode for saved notes
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [editCategory, setEditCategory] = useState("General");
+
+  // Flashcard deck state
+  const [flashcardIndex, setFlashcardIndex] = useState(0);
+  const [flashcardFlipped, setFlashcardFlipped] = useState(false);
 
   // Category management
   const [showCategoryManager, setShowCategoryManager] = useState(false);
@@ -182,18 +192,88 @@ export default function NotesPage() {
   const handleToggleExpand = (id: number) => {
     const note = notes.find((n) => n.id === id);
     if (note?.fullWidth && expandedNoteId === id) {
-      // Already in full width, close it
       setFullWidthEditor(false);
       setExpandedNoteId(null);
+      setEditingNoteId(null);
     } else if (note?.fullWidth) {
-      // Open in full width mode
       setExpandedNoteId(id);
       setFullWidthEditor(true);
+      setEditingNoteId(null);
     } else {
       setFullWidthEditor(false);
       setExpandedNoteId(expandedNoteId === id ? null : id);
     }
   };
+
+  // Load a saved note into the editor for editing
+  const handleEditNote = (note: NoteItem) => {
+    setEditingNoteId(note.id);
+    setEditTitle(note.title);
+    setEditBody(note.fullContent || "");
+    setEditCategory(note.category || "General");
+    // Load PDF attachment if exists
+    if (note.pdfData) {
+      setAttachments([{
+        id: `loaded-${note.id}`,
+        name: note.pdfName || "PDF",
+        type: "pdf" as const,
+        data: note.pdfData,
+        size: "",
+      }]);
+      setPdfText(`PDF: ${note.pdfName || "PDF"}`);
+    } else {
+      setAttachments([]);
+      setPdfText("");
+    }
+    setFlashcardIndex(0);
+    setFlashcardFlipped(false);
+  };
+
+  // Save edited note
+  const handleSaveEdit = () => {
+    if (!editingNoteId || !editTitle.trim()) return;
+    const updatedNotes = notes.map((n) => {
+      if (n.id !== editingNoteId) return n;
+      const firstPdf = attachments.find((a) => a.type === "pdf");
+      return {
+        ...n,
+        title: editTitle.trim(),
+        category: editCategory,
+        fullContent: editBody.trim() || undefined,
+        excerpt: editBody.trim().slice(0, 80) + (editBody.trim().length > 80 ? "..." : "") || n.excerpt,
+        pdfData: firstPdf?.data || n.pdfData,
+        pdfName: firstPdf?.name || n.pdfName,
+      };
+    });
+    setNotes(updatedNotes);
+    setEditingNoteId(null);
+    if (user) {
+      const updated = updatedNotes.find((n) => n.id === editingNoteId);
+      if (updated) saveNoteToFirestore(user.uid, updated).catch(() => {});
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setEditTitle("");
+    setEditBody("");
+    setAttachments([]);
+    setPdfText("");
+  };
+
+  // Flashcard navigation
+  const handlePrevCard = () => {
+    setFlashcardFlipped(false);
+    setFlashcardIndex((prev) => Math.max(0, prev - 1));
+  };
+  const handleNextCard = () => {
+    setFlashcardFlipped(false);
+    if (expandedNote?.ankiCards && expandedNote.ankiCards.length > 0) {
+      setFlashcardIndex((prev) => Math.min(expandedNote.ankiCards!.length - 1, prev + 1));
+    }
+  };
+  const handleFlipCard = () => setFlashcardFlipped(!flashcardFlipped);
 
   // Multi-file upload handler (PDF, PPTX, Video)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -383,21 +463,32 @@ export default function NotesPage() {
 
   // ====== FULL WIDTH EDITOR VIEW ======
   if (fullWidthEditor && expandedNote) {
-    return (
-      <div className="fixed inset-0 z-[70] bg-ivory" style={{ marginLeft: "var(--sidebar-width, 16rem)" }}>
-        {/* Back button */}
-        <button
-          onClick={() => { setFullWidthEditor(false); setExpandedNoteId(null); }}
-          className="fixed left-4 top-4 z-[71] flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-medium text-ink shadow-[var(--shadow-soft)] transition-colors hover:bg-ivory-warm"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Back to Notes
-        </button>
+    const isEditing = editingNoteId === expandedNote.id;
+    const currentCard = expandedNote.ankiCards?.[flashcardIndex];
 
-        <div className="h-full overflow-y-auto px-8 pt-20 pb-12">
-          <div className="mx-auto max-w-5xl">
-            {/* Note header */}
-            <div className="mb-6">
+    return (
+      <div className="fixed inset-0 z-[70] bg-ivory overflow-y-auto" style={{ marginLeft: "var(--sidebar-width, 16rem)" }}>
+        <div className="mx-auto max-w-5xl px-8 py-8">
+          {/* Back button — ABOVE the title */}
+          <button
+            onClick={() => { setFullWidthEditor(false); setExpandedNoteId(null); setEditingNoteId(null); }}
+            className="mb-4 flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-medium text-ink shadow-[var(--shadow-soft)] transition-colors hover:bg-ivory-warm"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to Notes
+          </button>
+
+          {/* Note title */}
+          <div className="mb-6">
+            {isEditing ? (
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-2xl font-bold text-ink focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10"
+                autoFocus
+              />
+            ) : (
               <div className="flex items-center gap-2">
                 <h1 className="text-3xl font-bold text-ink">{expandedNote.title}</h1>
                 <button
@@ -407,81 +498,236 @@ export default function NotesPage() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
-              </div>
-              <div className="mt-2 flex items-center gap-3 text-xs text-ink-muted">
-                <FileText className="h-3 w-3" />
-                {expandedNote.date}
-                {expandedNote.category && <span className="rounded-full bg-ivory-warm px-2 py-0.5 text-[9px]">{expandedNote.category}</span>}
-                <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                  expandedNote.tag === "PDF" ? "bg-red-50 text-red-500"
-                  : expandedNote.tag === "Anki" ? "bg-moss/5 text-moss"
-                  : expandedNote.tag === "Quiz" ? "bg-blue-50 text-blue-500"
-                  : "bg-gold/10 text-gold-dark"
-                }`}>{expandedNote.tag}</span>
-              </div>
-            </div>
-
-            {/* Attachments viewer */}
-            {expandedNote.pdfData && (
-              <div className="mb-6">
                 <button
-                  onClick={() => setPreviewAttachment({
-                    id: expandedNote.id.toString(),
-                    name: expandedNote.pdfName || "PDF",
-                    type: "pdf",
-                    data: expandedNote.pdfData,
-                  })}
-                  className="mb-3 flex items-center gap-1.5 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-100"
+                  onClick={() => handleEditNote(expandedNote)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted hover:bg-moss/5 hover:text-moss"
+                  title="Edit note"
                 >
-                  <FileUp className="h-4 w-4" />
-                  {expandedNote.pdfName || "View PDF"}
+                  <Pencil className="h-4 w-4" />
                 </button>
               </div>
             )}
+            <div className="mt-2 flex items-center gap-3 text-xs text-ink-muted">
+              <FileText className="h-3 w-3" />
+              {expandedNote.date}
+              {isEditing ? (
+                <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)}
+                  className="rounded-lg border border-ivory-deep bg-white px-2 py-0.5 text-xs text-ink focus:border-moss/30 focus:outline-none">
+                  {categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}
+                </select>
+              ) : (
+                expandedNote.category && <span className="rounded-full bg-ivory-warm px-2 py-0.5 text-[9px]">{expandedNote.category}</span>
+              )}
+              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                expandedNote.tag === "PDF" ? "bg-red-50 text-red-500"
+                : expandedNote.tag === "Anki" ? "bg-moss/5 text-moss"
+                : expandedNote.tag === "Quiz" ? "bg-blue-50 text-blue-500"
+                : "bg-gold/10 text-gold-dark"
+              }`}>{expandedNote.tag}</span>
+            </div>
+          </div>
 
-            {/* Anki cards */}
-            {expandedNote.ankiCards && expandedNote.ankiCards.length > 0 && (
-              <div className="mb-6 space-y-3">
-                <h3 className="text-sm font-semibold text-ink">Anki Cards</h3>
-                {expandedNote.ankiCards.map((card, i) => (
-                  <div key={i} className="rounded-xl bg-ivory-warm/40 p-4">
-                    <p className="text-sm font-semibold text-ink">Q: {card.front}</p>
-                    <p className="mt-1 text-sm text-ink-soft">A: {card.back}</p>
+          {/* ====== EDIT MODE ====== */}
+          {isEditing ? (
+            <div className="space-y-4">
+              {/* File upload in edit mode */}
+              <div>
+                <div onClick={() => pdfInputRef.current?.click()} className="cursor-pointer rounded-xl border-2 border-dashed border-ivory-deep p-4 text-center transition-colors hover:border-moss/30 hover:bg-moss/5">
+                  <FileUp className="mx-auto mb-1 h-6 w-6 text-ink-muted" />
+                  <p className="text-[11px] text-ink-muted">Add PDF, PowerPoint, or Video</p>
+                </div>
+                {attachments.map((att) => (
+                  <div key={att.id} className="mt-2 flex items-center gap-2 rounded-lg bg-ivory-warm/40 px-3 py-2">
+                    {att.type === "pdf" && <FileUp className="h-4 w-4 text-red-400" />}
+                    {att.type === "pptx" && <File className="h-4 w-4 text-orange-500" />}
+                    {att.type === "video" && <Video className="h-4 w-4 text-blue-500" />}
+                    <span className="flex-1 truncate text-xs text-ink">{att.name}</span>
+                    <button onClick={() => handleRemoveAttachment(att.id)} className="text-ink-muted hover:text-red-500"><X className="h-3 w-3" /></button>
                   </div>
                 ))}
               </div>
-            )}
 
-            {/* Quiz */}
-            {expandedNote.quizQuestions && expandedNote.quizQuestions.length > 0 && (
-              <div className="mb-6 space-y-4">
-                <h3 className="text-sm font-semibold text-ink">Quiz Questions</h3>
-                {expandedNote.quizQuestions.map((q, i) => (
-                  <div key={i} className="rounded-xl bg-blue-50/40 p-4">
-                    <p className="text-sm font-semibold text-ink">Q{i + 1}: {q.question}</p>
-                    <div className="mt-2 space-y-1">
-                      {q.options.map((opt, j) => (
-                        <p key={j} className={`text-sm ${j === q.answer ? "font-medium text-moss" : "text-ink-soft"}`}>
-                          {j === q.answer ? "✓ " : "• "}{opt}
-                        </p>
-                      ))}
+              {/* AI generation buttons */}
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-xl border border-moss/20 bg-moss/5 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-moss" />
+                      <span className="text-[11px] font-medium text-ink">Anki Cards (AI)</span>
+                    </div>
+                    <input type="number" min={1} max={20} value={ankiCount}
+                      onChange={(e) => setAnkiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
+                      className="w-10 rounded-md border border-ivory-deep bg-white px-1 py-0.5 text-[10px] text-ink focus:border-moss/30 focus:outline-none" />
+                  </div>
+                  <button onClick={async () => {
+                    setGeneratingAnki(true);
+                    try {
+                      const res = await fetch("/api/generate-study-materials", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ generateType: "anki", uploadedMaterial: buildUploadedMaterial(), noteContent: editBody, count: ankiCount }),
+                      });
+                      const data = await res.json();
+                      if (data.ankiCards?.length > 0) {
+                        const updatedNotes = notes.map((n) => n.id === editingNoteId ? { ...n, ankiCards: data.ankiCards, fullContent: editBody.trim() || n.fullContent } : n);
+                        setNotes(updatedNotes);
+                      }
+                    } catch {}
+                    setGeneratingAnki(false);
+                  }} disabled={!editTitle.trim() || generatingAnki}
+                    className="flex w-full items-center justify-center gap-1 rounded-lg bg-moss px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
+                    {generatingAnki ? <Loader2 className="h-3 w-3 animate-spin" /> : <Layers className="h-3 w-3" />}
+                    {generatingAnki ? "..." : `Generate ${ankiCount}`}
+                  </button>
+                </div>
+                <div className="flex-1 rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <HelpCircle className="h-3.5 w-3.5 text-blue-500" />
+                      <span className="text-[11px] font-medium text-ink">Quiz (AI)</span>
+                    </div>
+                    <input type="number" min={1} max={20} value={quizCount}
+                      onChange={(e) => setQuizCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
+                      className="w-10 rounded-md border border-ivory-deep bg-white px-1 py-0.5 text-[10px] text-ink focus:border-blue-300 focus:outline-none" />
+                  </div>
+                  <button onClick={async () => {
+                    setGeneratingQuiz(true);
+                    try {
+                      const res = await fetch("/api/generate-study-materials", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ generateType: "quiz", uploadedMaterial: buildUploadedMaterial(), noteContent: editBody, count: quizCount }),
+                      });
+                      const data = await res.json();
+                      if (data.quizQuestions?.length > 0) {
+                        const updatedNotes = notes.map((n) => n.id === editingNoteId ? { ...n, quizQuestions: data.quizQuestions, fullContent: editBody.trim() || n.fullContent } : n);
+                        setNotes(updatedNotes);
+                      }
+                    } catch {}
+                    setGeneratingQuiz(false);
+                  }} disabled={!editTitle.trim() || generatingQuiz}
+                    className="flex w-full items-center justify-center gap-1 rounded-lg bg-blue-500 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50">
+                    {generatingQuiz ? <Loader2 className="h-3 w-3 animate-spin" /> : <HelpCircle className="h-3 w-3" />}
+                    {generatingQuiz ? "..." : `Generate ${quizCount}`}
+                  </button>
+                </div>
+              </div>
+
+              {/* Editable content */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-ink-muted">Note content</label>
+                <textarea
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                  placeholder="Edit your note content..."
+                  rows={8}
+                  className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10 resize-y min-h-[200px]"
+                />
+              </div>
+
+              {/* Save / Cancel */}
+              <div className="flex gap-2">
+                <button onClick={handleSaveEdit} disabled={!editTitle.trim()}
+                  className="flex-1 rounded-xl bg-moss py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
+                  Save Changes
+                </button>
+                <button onClick={handleCancelEdit}
+                  className="rounded-xl border border-ivory-deep px-6 py-3 text-sm font-medium text-ink-soft transition-colors hover:bg-ivory-warm">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ====== VIEW MODE ====== */
+            <>
+              {/* Attachments viewer */}
+              {expandedNote.pdfData && (
+                <div className="mb-6">
+                  <button
+                    onClick={() => setPreviewAttachment({ id: expandedNote.id.toString(), name: expandedNote.pdfName || "PDF", type: "pdf", data: expandedNote.pdfData })}
+                    className="flex items-center gap-1.5 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-100"
+                  >
+                    <FileUp className="h-4 w-4" /> {expandedNote.pdfName || "View PDF"}
+                  </button>
+                </div>
+              )}
+
+              {/* Interactive Anki Flashcards */}
+              {expandedNote.ankiCards && expandedNote.ankiCards.length > 0 && currentCard && (
+                <div className="mb-6">
+                  <h3 className="mb-3 text-sm font-semibold text-ink">Anki Cards ({flashcardIndex + 1} / {expandedNote.ankiCards.length})</h3>
+
+                  {/* Flashcard */}
+                  <div className="flashcard-container mb-4" style={{ height: "280px" }}>
+                    <div
+                      className={`flashcard-inner h-full w-full cursor-pointer ${flashcardFlipped ? "flipped" : ""}`}
+                      onClick={handleFlipCard}
+                    >
+                      {/* Front face */}
+                      <div className="flashcard-face rounded-2xl bg-white border-2 border-moss/20 shadow-[var(--shadow-card)] p-6">
+                        <span className="absolute top-3 left-3 text-[10px] font-semibold uppercase tracking-wide text-moss">Question</span>
+                        <p className="text-center text-lg font-medium text-ink px-4">{currentCard.front}</p>
+                        <span className="absolute bottom-3 text-[10px] text-ink-muted">Click to flip</span>
+                      </div>
+                      {/* Back face */}
+                      <div className="flashcard-face flashcard-back rounded-2xl bg-moss/5 border-2 border-moss/30 shadow-[var(--shadow-card)] p-6">
+                        <span className="absolute top-3 left-3 text-[10px] font-semibold uppercase tracking-wide text-gold-dark">Answer</span>
+                        <p className="text-center text-base text-ink-soft px-4">{currentCard.back}</p>
+                        <span className="absolute bottom-3 text-[10px] text-ink-muted">Click to flip back</span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
 
-            {/* Full content */}
-            {expandedNote.fullContent && (
-              <div className="prose prose-sm max-w-none">
-                <p className="whitespace-pre-wrap text-base leading-relaxed text-ink-soft">{expandedNote.fullContent}</p>
-              </div>
-            )}
+                  {/* Navigation controls */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={handlePrevCard}
+                      disabled={flashcardIndex === 0}
+                      className="flex items-center gap-1 rounded-lg border border-ivory-deep px-4 py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-ivory-warm disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Previous
+                    </button>
+                    <span className="text-xs text-ink-muted">Card {flashcardIndex + 1} of {expandedNote.ankiCards.length}</span>
+                    <button
+                      onClick={handleNextCard}
+                      disabled={flashcardIndex >= (expandedNote.ankiCards.length - 1)}
+                      className="flex items-center gap-1 rounded-lg border border-ivory-deep px-4 py-2 text-xs font-medium text-ink-soft transition-colors hover:bg-ivory-warm disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
-            {!expandedNote.fullContent && !expandedNote.ankiCards && !expandedNote.quizQuestions && !expandedNote.pdfData && (
-              <p className="text-sm text-ink-muted italic">This note has no additional content.</p>
-            )}
-          </div>
+              {/* Quiz */}
+              {expandedNote.quizQuestions && expandedNote.quizQuestions.length > 0 && (
+                <div className="mb-6 space-y-4">
+                  <h3 className="text-sm font-semibold text-ink">Quiz Questions</h3>
+                  {expandedNote.quizQuestions.map((q, i) => (
+                    <div key={i} className="rounded-xl bg-blue-50/40 p-4">
+                      <p className="text-sm font-semibold text-ink">Q{i + 1}: {q.question}</p>
+                      <div className="mt-2 space-y-1">
+                        {q.options.map((opt, j) => (
+                          <p key={j} className={`text-sm ${j === q.answer ? "font-medium text-moss" : "text-ink-soft"}`}>
+                            {j === q.answer ? "✓ " : "• "}{opt}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Full content */}
+              {expandedNote.fullContent && (
+                <div className="prose prose-sm max-w-none">
+                  <p className="whitespace-pre-wrap text-base leading-relaxed text-ink-soft">{expandedNote.fullContent}</p>
+                </div>
+              )}
+
+              {!expandedNote.fullContent && !expandedNote.ankiCards && !expandedNote.quizQuestions && !expandedNote.pdfData && (
+                <p className="text-sm text-ink-muted italic">This note has no additional content. Click the edit button to add content.</p>
+              )}
+            </>
+          )}
         </div>
       </div>
     );
