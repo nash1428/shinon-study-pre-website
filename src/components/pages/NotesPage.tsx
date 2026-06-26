@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import {
   FileText, Plus, Upload, Layers, X, FileUp, HelpCircle,
   AlignJustify, Columns2, Trash2, Mic, Loader2, ListPlus, ChevronLeft, Pencil, Check, Settings2,
+  Video, Play, Link2, File,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentNotes as initialNotes, type NoteItem, type AnkiCard, type QuizQuestion } from "@/lib/data";
@@ -26,12 +27,23 @@ export default function NotesPage() {
   const [newBody, setNewBody] = useState("");
   const [widthMode, setWidthMode] = useState<WidthMode>("standard");
   const [newCategory, setNewCategory] = useState("General");
-  const [pdfData, setPdfData] = useState<string | null>(null);
-  const [pdfName, setPdfName] = useState<string>("");
-  const [pdfText, setPdfText] = useState<string>("");
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
-  const [viewingPdf, setViewingPdf] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
+
+  // Multi-file attachments (PDF, PPTX, Video file, Video URL)
+  interface Attachment {
+    id: string;
+    name: string;
+    type: "pdf" | "pptx" | "video" | "url";
+    data?: string; // base64 data URL for files
+    url?: string;  // URL for video links
+    size?: string;
+  }
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [showVideoUrlInput, setShowVideoUrlInput] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  const [pdfText, setPdfText] = useState<string>("");
 
   // Full-width editor mode
   const [fullWidthEditor, setFullWidthEditor] = useState(false);
@@ -71,8 +83,9 @@ export default function NotesPage() {
     setNewBody("");
     setWidthMode("standard");
     setNewCategory("General");
-    setPdfData(null);
-    setPdfName("");
+    setAttachments([]);
+    setVideoUrl("");
+    setShowVideoUrlInput(false);
     setPdfText("");
     setInlineTaskTitle("");
     setInlineTaskDeadline("");
@@ -138,17 +151,18 @@ export default function NotesPage() {
 
   const handleCreate = (tag: string) => {
     if (!newTitle.trim()) return;
+    const firstPdf = attachments.find((a) => a.type === "pdf");
     const newNote: NoteItem = {
       id: Date.now(),
       title: newTitle.trim(),
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       tag,
       category: newCategory,
-      excerpt: newBody.trim().slice(0, 80) + (newBody.trim().length > 80 ? "..." : "") || (tag === "PDF" ? "PDF lecture notes (click to view)..." : tag === "Anki" ? "Anki card deck..." : "Quiz questions..."),
+      excerpt: newBody.trim().slice(0, 80) + (newBody.trim().length > 80 ? "..." : "") || (attachments.length > 0 ? `${attachments.length} attachment(s)` : "Click to view..."),
       fullContent: newBody.trim() || undefined,
       fullWidth: widthMode === "full",
-      pdfData: pdfData || undefined,
-      pdfName: pdfName || undefined,
+      pdfData: firstPdf?.data || undefined,
+      pdfName: firstPdf?.name || undefined,
     };
     setNotes([newNote, ...notes]);
     if (user) {
@@ -181,17 +195,57 @@ export default function NotesPage() {
     }
   };
 
-  // PDF upload handler
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Multi-file upload handler (PDF, PPTX, Video)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || file.type !== "application/pdf") return;
-    setPdfName(file.name);
+    if (!file) return;
+
+    const fileName = file.name;
+    const fileExt = fileName.split(".").pop()?.toLowerCase();
+    const fileSize = `${(file.size / 1024).toFixed(0)}KB`;
+
+    let attachmentType: Attachment["type"] = "pdf";
+    if (fileExt === "pdf") attachmentType = "pdf";
+    else if (fileExt === "pptx" || fileExt === "ppt") attachmentType = "pptx";
+    else if (["mp4", "webm", "mov", "avi", "mkv"].includes(fileExt || "")) attachmentType = "video";
+    else return;
+
     const reader = new FileReader();
     reader.onloadend = () => {
-      setPdfData(reader.result as string);
-      setPdfText(`PDF: ${file.name} (${(file.size / 1024).toFixed(0)}KB)`);
+      const newAttachment: Attachment = {
+        id: `att-${Date.now()}`,
+        name: fileName,
+        type: attachmentType,
+        data: reader.result as string,
+        size: fileSize,
+      };
+      setAttachments((prev) => [...prev, newAttachment]);
+      if (attachmentType === "pdf") {
+        setPdfText(`PDF: ${fileName} (${fileSize})`);
+      }
     };
     reader.readAsDataURL(file);
+    // Reset input so the same file can be uploaded again
+    e.target.value = "";
+  };
+
+  // Add video URL
+  const handleAddVideoUrl = () => {
+    if (!videoUrl.trim()) return;
+    const newAttachment: Attachment = {
+      id: `att-${Date.now()}`,
+      name: videoUrl.trim(),
+      type: "url",
+      url: videoUrl.trim(),
+    };
+    setAttachments((prev) => [...prev, newAttachment]);
+    setVideoUrl("");
+    setShowVideoUrlInput(false);
+  };
+
+  // Remove attachment
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
   // Audio recording
@@ -243,7 +297,7 @@ export default function NotesPage() {
       const res = await fetch("/api/generate-study-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfText, noteContent: newBody, type: "anki", count: ankiCount }),
+        body: JSON.stringify({ pdfText: attachments.find(a => a.type === "pdf") ? pdfText : "", noteContent: newBody, type: "anki", count: ankiCount }),
       });
       const data = await res.json();
       if (data.ankiCards?.length > 0) {
@@ -269,7 +323,7 @@ export default function NotesPage() {
       const res = await fetch("/api/generate-study-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfText, noteContent: newBody, type: "quiz", count: quizCount }),
+        body: JSON.stringify({ pdfText: attachments.find(a => a.type === "pdf") ? pdfText : "", noteContent: newBody, type: "quiz", count: quizCount }),
       });
       const data = await res.json();
       if (data.quizQuestions?.length > 0) {
@@ -330,19 +384,21 @@ export default function NotesPage() {
               </div>
             </div>
 
-            {/* PDF viewer */}
+            {/* Attachments viewer */}
             {expandedNote.pdfData && (
               <div className="mb-6">
                 <button
-                  onClick={() => setViewingPdf(viewingPdf === expandedNote.id.toString() ? null : expandedNote.id.toString())}
+                  onClick={() => setPreviewAttachment({
+                    id: expandedNote.id.toString(),
+                    name: expandedNote.pdfName || "PDF",
+                    type: "pdf",
+                    data: expandedNote.pdfData,
+                  })}
                   className="mb-3 flex items-center gap-1.5 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-100"
                 >
                   <FileUp className="h-4 w-4" />
                   {expandedNote.pdfName || "View PDF"}
                 </button>
-                {viewingPdf === expandedNote.id.toString() && (
-                  <iframe src={expandedNote.pdfData} className="h-[600px] w-full rounded-xl border border-ivory-deep" title={expandedNote.pdfName || "PDF"} />
-                )}
               </div>
             )}
 
@@ -397,7 +453,7 @@ export default function NotesPage() {
   // ====== NORMAL NOTES LIST VIEW ======
   return (
     <div className="page-enter">
-      <input ref={pdfInputRef} type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
+      <input ref={pdfInputRef} type="file" accept=".pdf,.pptx,.ppt,.mp4,.webm,.mov,.avi,.mkv" onChange={handleFileUpload} className="hidden" />
 
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
@@ -537,13 +593,20 @@ export default function NotesPage() {
 
             {expandedNoteId === note.id && !note.fullWidth && (
               <div className="mt-4 border-t border-ivory-deep/30 pt-4" onClick={(e) => e.stopPropagation()}>
-                {/* PDF viewer */}
+                {/* Attachments viewer */}
                 {note.pdfData && (
                   <div className="mb-3">
-                    <button onClick={() => setViewingPdf(viewingPdf === note.id.toString() ? null : note.id.toString())} className="mb-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-100">
+                    <button
+                      onClick={() => setPreviewAttachment({
+                        id: note.id.toString(),
+                        name: note.pdfName || "PDF",
+                        type: "pdf",
+                        data: note.pdfData,
+                      })}
+                      className="mb-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-100"
+                    >
                       <FileUp className="h-3.5 w-3.5" /> {note.pdfName || "View PDF"}
                     </button>
-                    {viewingPdf === note.id.toString() && <iframe src={note.pdfData} className="h-[500px] w-full rounded-xl border border-ivory-deep" title={note.pdfName || "PDF"} />}
                   </div>
                 )}
 
@@ -613,7 +676,6 @@ export default function NotesPage() {
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-ink">New Note</h2>
               <div className="flex items-center gap-2">
-                {/* Width toggle: Standard vs Full Width */}
                 <button
                   onClick={() => setWidthMode(widthMode === "full" ? "standard" : "full")}
                   className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
@@ -633,7 +695,7 @@ export default function NotesPage() {
             </div>
 
             <div className="space-y-4">
-              {/* Title + Category */}
+              {/* 1. Title + Category */}
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="mb-1.5 block text-xs font-medium text-ink-muted">Note title</label>
@@ -651,11 +713,108 @@ export default function NotesPage() {
                 </div>
               </div>
 
-              {/* Note content — single textarea, no course tabs */}
+              {/* 2. File Upload (PDF, PPTX, Video) */}
+              <div>
+                <div
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="cursor-pointer rounded-xl border-2 border-dashed border-ivory-deep p-4 text-center transition-colors hover:border-moss/30 hover:bg-moss/5"
+                >
+                  <FileUp className="mx-auto mb-1 h-6 w-6 text-ink-muted" />
+                  <p className="text-[11px] text-ink-muted">Click to upload PDF, PowerPoint, or Video</p>
+                  <p className="mt-0.5 text-[10px] text-ink-muted/60">.pdf, .pptx, .mp4, .webm</p>
+                </div>
+
+                {/* Video URL input toggle */}
+                <button
+                  onClick={() => setShowVideoUrlInput(!showVideoUrlInput)}
+                  className="mt-2 flex items-center gap-1 text-[10px] text-moss hover:text-moss-dark"
+                >
+                  <Link2 className="h-3 w-3" /> Add video URL instead
+                </button>
+                {showVideoUrlInput && (
+                  <div className="mt-2 flex gap-2">
+                    <input type="text" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddVideoUrl()}
+                      placeholder="https://youtube.com/... or video URL"
+                      className="flex-1 rounded-lg border border-ivory-deep bg-white px-3 py-2 text-xs text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10" />
+                    <button onClick={handleAddVideoUrl} disabled={!videoUrl.trim()}
+                      className="flex items-center gap-1 rounded-lg bg-moss px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
+                      <Plus className="h-3 w-3" /> Add
+                    </button>
+                  </div>
+                )}
+
+                {/* Attachment list */}
+                {attachments.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {attachments.map((att) => (
+                      <div key={att.id} className="group flex items-center gap-2 rounded-lg bg-ivory-warm/40 px-3 py-2">
+                        {att.type === "pdf" && <FileUp className="h-4 w-4 shrink-0 text-red-400" />}
+                        {att.type === "pptx" && <File className="h-4 w-4 shrink-0 text-orange-500" />}
+                        {att.type === "video" && <Video className="h-4 w-4 shrink-0 text-blue-500" />}
+                        {att.type === "url" && <Link2 className="h-4 w-4 shrink-0 text-blue-500" />}
+                        <span className="flex-1 truncate text-xs text-ink">{att.name}</span>
+                        {att.size && <span className="text-[10px] text-ink-muted">{att.size}</span>}
+                        <button
+                          onClick={() => setPreviewAttachment(att)}
+                          className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:bg-moss/5 hover:text-moss"
+                          title="Preview"
+                        >
+                          <Play className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveAttachment(att.id)}
+                          className="flex h-6 w-6 items-center justify-center rounded-lg text-ink-muted hover:bg-red-50 hover:text-red-500"
+                          title="Remove"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 3. AI Generation buttons — horizontal row */}
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-xl border border-moss/20 bg-moss/5 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-moss" />
+                      <span className="text-[11px] font-medium text-ink">Anki Cards (AI)</span>
+                    </div>
+                    <input type="number" min={1} max={20} value={ankiCount}
+                      onChange={(e) => setAnkiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
+                      className="w-10 rounded-md border border-ivory-deep bg-white px-1 py-0.5 text-[10px] text-ink focus:border-moss/30 focus:outline-none" />
+                  </div>
+                  <button onClick={handleGenerateAnki} disabled={!newTitle.trim() || generatingAnki}
+                    className="flex w-full items-center justify-center gap-1 rounded-lg bg-moss px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
+                    {generatingAnki ? <Loader2 className="h-3 w-3 animate-spin" /> : <Layers className="h-3 w-3" />}
+                    {generatingAnki ? "..." : `Generate ${ankiCount}`}
+                  </button>
+                </div>
+                <div className="flex-1 rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <HelpCircle className="h-3.5 w-3.5 text-blue-500" />
+                      <span className="text-[11px] font-medium text-ink">Quiz (AI)</span>
+                    </div>
+                    <input type="number" min={1} max={20} value={quizCount}
+                      onChange={(e) => setQuizCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
+                      className="w-10 rounded-md border border-ivory-deep bg-white px-1 py-0.5 text-[10px] text-ink focus:border-blue-300 focus:outline-none" />
+                  </div>
+                  <button onClick={handleGenerateQuiz} disabled={!newTitle.trim() || generatingQuiz}
+                    className="flex w-full items-center justify-center gap-1 rounded-lg bg-blue-500 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50">
+                    {generatingQuiz ? <Loader2 className="h-3 w-3 animate-spin" /> : <HelpCircle className="h-3 w-3" />}
+                    {generatingQuiz ? "..." : `Generate ${quizCount}`}
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Note Content */}
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-xs font-medium text-ink-muted">
                   <span>Note content</span>
-                  {/* Audio summary button */}
                   {!isRecording ? (
                     <button onClick={handleStartRecording} disabled={audioSummarizing}
                       className="flex items-center gap-1 rounded-lg bg-moss/10 px-2 py-1 text-[10px] font-medium text-moss transition-colors hover:bg-moss/20 disabled:opacity-50">
@@ -673,30 +832,16 @@ export default function NotesPage() {
                   onChange={(e) => setNewBody(e.target.value)}
                   placeholder="Type your note content here, or use Audio Summary to generate from audio..."
                   rows={6}
-                  className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10 resize-y min-h-[160px]"
+                  className={`w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10 resize-y ${
+                    widthMode === "full" ? "min-h-[300px]" : "min-h-[160px]"
+                  }`}
                 />
               </div>
 
-              {/* PDF upload */}
-              <div onClick={() => pdfInputRef.current?.click()} className="cursor-pointer rounded-xl border-2 border-dashed border-ivory-deep p-4 text-center transition-colors hover:border-moss/30 hover:bg-moss/5">
-                {pdfData ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <FileUp className="h-5 w-5 text-moss" />
-                    <span className="text-xs font-medium text-ink">{pdfName}</span>
-                    <span className="text-[10px] text-moss">✓ Uploaded</span>
-                  </div>
-                ) : (
-                  <>
-                    <FileUp className="mx-auto mb-1 h-6 w-6 text-ink-muted" />
-                    <p className="text-[11px] text-ink-muted">Click to upload a Lecture PDF</p>
-                  </>
-                )}
-              </div>
-
-              {/* Inline Task Creator */}
+              {/* 5. Add Task */}
               <div className="rounded-xl border border-ivory-deep bg-ivory-warm/20 p-3">
                 <label className="mb-2 flex items-center gap-1.5 text-xs font-medium text-ink-muted">
-                  <ListPlus className="h-3.5 w-3.5" /> Add Task (syncs with Task Tracker)
+                  <ListPlus className="h-3.5 w-3.5" /> Add Task
                 </label>
                 <div className="flex gap-2">
                   <input type="text" value={inlineTaskTitle} onChange={(e) => setInlineTaskTitle(e.target.value)}
@@ -711,53 +856,77 @@ export default function NotesPage() {
                 </div>
               </div>
 
-              {/* AI generation — Anki */}
-              <div className="rounded-xl border border-moss/20 bg-moss/5 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Layers className="h-3.5 w-3.5 text-moss" />
-                    <span className="text-xs font-medium text-ink">Generate Anki Cards (AI)</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-[10px] text-ink-muted">Count:</label>
-                    <input type="number" min={1} max={20} value={ankiCount}
-                      onChange={(e) => setAnkiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
-                      className="w-12 rounded-md border border-ivory-deep bg-white px-1.5 py-1 text-xs text-ink focus:border-moss/30 focus:outline-none" />
-                  </div>
-                </div>
-                <button onClick={handleGenerateAnki} disabled={!newTitle.trim() || generatingAnki}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-moss px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
-                  {generatingAnki ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
-                  {generatingAnki ? "Generating..." : `Generate ${ankiCount} Anki Cards`}
-                </button>
-              </div>
-
-              {/* AI generation — Quiz */}
-              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <HelpCircle className="h-3.5 w-3.5 text-blue-500" />
-                    <span className="text-xs font-medium text-ink">Generate Quiz (AI)</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <label className="text-[10px] text-ink-muted">Count:</label>
-                    <input type="number" min={1} max={20} value={quizCount}
-                      onChange={(e) => setQuizCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
-                      className="w-12 rounded-md border border-ivory-deep bg-white px-1.5 py-1 text-xs text-ink focus:border-blue-300 focus:outline-none" />
-                  </div>
-                </div>
-                <button onClick={handleGenerateQuiz} disabled={!newTitle.trim() || generatingQuiz}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50">
-                  {generatingQuiz ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <HelpCircle className="h-3.5 w-3.5" />}
-                  {generatingQuiz ? "Generating..." : `Generate ${quizCount} Quiz Questions`}
-                </button>
-              </div>
-
               <button onClick={() => handleCreate("Note")} disabled={!newTitle.trim()}
                 className="w-full rounded-xl bg-moss py-3 text-sm font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
                 Create Note
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* File Preview Modal */}
+      {previewAttachment && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setPreviewAttachment(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl rounded-2xl bg-white p-4 shadow-[var(--shadow-float)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-ink">{previewAttachment.name}</h3>
+              <button onClick={() => setPreviewAttachment(null)} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* PDF viewer */}
+            {previewAttachment.type === "pdf" && previewAttachment.data && (
+              <iframe src={previewAttachment.data} className="h-[600px] w-full rounded-xl border border-ivory-deep" title={previewAttachment.name} />
+            )}
+
+            {/* PPTX viewer — show as download link (can't render inline) */}
+            {previewAttachment.type === "pptx" && previewAttachment.data && (
+              <div className="flex flex-col items-center py-12">
+                <File className="mb-3 h-12 w-12 text-orange-500" />
+                <p className="mb-2 text-sm text-ink-muted">PowerPoint files can't be previewed inline.</p>
+                <a href={previewAttachment.data} download={previewAttachment.name}
+                  className="flex items-center gap-1.5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600">
+                  <FileUp className="h-4 w-4" /> Download {previewAttachment.name}
+                </a>
+              </div>
+            )}
+
+            {/* Video file player */}
+            {previewAttachment.type === "video" && previewAttachment.data && (
+              <video controls className="h-[600px] w-full rounded-xl border border-ivory-deep">
+                <source src={previewAttachment.data} />
+              </video>
+            )}
+
+            {/* Video URL player (YouTube or direct link) */}
+            {previewAttachment.type === "url" && previewAttachment.url && (
+              <div className="flex flex-col items-center">
+                {previewAttachment.url.includes("youtube.com") || previewAttachment.url.includes("youtu.be") ? (
+                  <iframe
+                    src={previewAttachment.url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/")}
+                    className="h-[600px] w-full rounded-xl border border-ivory-deep"
+                    title={previewAttachment.name}
+                    allowFullScreen
+                  />
+                ) : (
+                  <video controls className="h-[600px] w-full rounded-xl border border-ivory-deep">
+                    <source src={previewAttachment.url} />
+                  </video>
+                )}
+                <a href={previewAttachment.url} target="_blank" rel="noopener noreferrer"
+                  className="mt-3 flex items-center gap-1 text-xs text-moss hover:text-moss-dark">
+                  <Link2 className="h-3 w-3" /> Open original link
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}
