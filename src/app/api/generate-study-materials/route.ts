@@ -1,15 +1,86 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
+interface UploadedMaterial {
+  type: "pdf" | "powerpoint" | "video";
+  extractedText?: string;
+  url?: string;
+}
+
+interface GenerateRequest {
+  userId?: string;
+  noteId?: string;
+  generateType?: "anki" | "quiz";
+  uploadedMaterial?: UploadedMaterial;
+  noteContent?: string;
+  type?: string;
+  count?: number;
+  pdfText?: string;
+}
+
+/**
+ * Context Builder — dynamically builds the prompt context string.
+ * Checks if uploadedMaterial.extractedText and/or noteContent exist,
+ * and combines them intelligently (or just uses the one that exists).
+ */
+function buildContextString(req: GenerateRequest): string {
+  const parts: string[] = [];
+
+  // Check for uploaded material content
+  const fileText = req.uploadedMaterial?.extractedText || req.pdfText || "";
+  const fileType = req.uploadedMaterial?.type || (req.pdfText ? "pdf" : null);
+  const fileUrl = req.uploadedMaterial?.url;
+
+  if (fileText && fileText.trim()) {
+    const typeLabel = fileType === "pdf" ? "PDF Document" : fileType === "powerpoint" ? "PowerPoint Slides" : fileType === "video" ? "Video Transcript" : "Uploaded Material";
+    parts.push(`=== ${typeLabel} ===\n${fileText.trim()}`);
+  } else if (fileUrl) {
+    parts.push(`=== Video URL (no transcript available) ===\nVideo URL: ${fileUrl}\n(Note: No transcript text was extracted from this video. Generate questions based on the note content if available, or create general study questions.)`);
+  }
+
+  // Check for note content
+  const noteText = req.noteContent || "";
+  if (noteText && noteText.trim()) {
+    parts.push(`=== User's Note Content ===\n${noteText.trim()}`);
+  }
+
+  if (parts.length === 0) {
+    return "No specific study material was provided. Please generate general study questions about the topic indicated by the note title.";
+  }
+
+  return `You have the following study material(s) to base your questions on. Use ALL available sources.\n\n${parts.join("\n\n")}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { pdfText, noteContent, type, count } = await req.json();
+    const body = await req.json();
 
-    if (!pdfText && !noteContent) {
-      return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    // Support both old format (pdfText, noteContent, type) and new format (uploadedMaterial, noteContent, generateType)
+    const generateRequest: GenerateRequest = {
+      userId: body.userId,
+      noteId: body.noteId,
+      generateType: body.generateType || body.type,
+      uploadedMaterial: body.uploadedMaterial,
+      noteContent: body.noteContent,
+      type: body.type,
+      count: body.count,
+      pdfText: body.pdfText,
+    };
+
+    const type = generateRequest.generateType || generateRequest.type || "anki";
+
+    // Check if at least one source exists
+    const hasFileContent = (generateRequest.uploadedMaterial?.extractedText?.trim()) || (generateRequest.pdfText?.trim()) || (generateRequest.uploadedMaterial?.url?.trim());
+    const hasNoteContent = generateRequest.noteContent?.trim();
+
+    if (!hasFileContent && !hasNoteContent) {
+      return NextResponse.json({
+        error: "Please add some content (notes or a file) before generating study materials.",
+      }, { status: 400 });
     }
 
-    const itemCount = Math.max(1, Math.min(20, count || 5));
+    const itemCount = Math.max(1, Math.min(20, generateRequest.count || 5));
+    const contextString = buildContextString(generateRequest);
 
     const apiKey = process.env.AIAND_API_KEY;
     if (!apiKey) {
@@ -35,17 +106,24 @@ export async function POST(req: NextRequest) {
       apiKey,
     });
 
-    const combinedContent = `Lecture PDF content:\n${pdfText || "(no PDF provided)"}\n\nNote content:\n${noteContent || "(no notes provided)"}`;
-
     if (type === "anki") {
       const completion = await client.chat.completions.create({
         model: "openai/gpt-oss-120b",
         messages: [
           {
             role: "system",
-            content: `You are a study assistant that creates Anki flashcards. Based on the provided study material, generate exactly ${itemCount} high-quality Anki cards. Return ONLY a JSON array of objects with "front" and "back" fields. Example: [{"front":"What is X?","back":"X is..."}]`,
+            content: `You are a study assistant that creates Anki flashcards. Based on the provided study material(s), generate exactly ${itemCount} high-quality Anki cards. 
+
+Rules:
+- Base your questions on the ACTUAL content provided in the context.
+- Do NOT make up information that isn't in the study material.
+- If multiple sources are provided (e.g., file + notes), combine information from both.
+- If only one source is provided, use only that source.
+- Each card should test a key concept, definition, or fact from the material.
+
+Return ONLY a JSON array of objects with "front" and "back" fields. Example: [{"front":"What is X?","back":"X is..."}]`,
           },
-          { role: "user", content: combinedContent },
+          { role: "user", content: contextString },
         ],
       });
 
@@ -58,16 +136,31 @@ export async function POST(req: NextRequest) {
         ankiCards = match ? JSON.parse(match[0]) : [];
       }
 
-      return NextResponse.json({ ok: true, ankiCards: Array.isArray(ankiCards) ? ankiCards : [] });
+      return NextResponse.json({
+        ok: true,
+        ankiCards: Array.isArray(ankiCards) ? ankiCards : [],
+        source: hasFileContent && hasNoteContent ? "file+notes" : hasFileContent ? "file" : "notes",
+      });
     } else {
       const completion = await client.chat.completions.create({
         model: "openai/gpt-oss-120b",
         messages: [
           {
             role: "system",
-            content: `You are a study assistant that creates quiz questions. Based on the provided study material, generate exactly ${itemCount} multiple-choice questions with 4 options each. Return ONLY a JSON array of objects. Each question has: "question" (string), "options" (array of 4 strings), "answer" (index 0-3 of correct option). Example: [{"question":"What is X?","options":["A","B","C","D"],"answer":0}]`,
+            content: `You are a study assistant that creates quiz questions. Based on the provided study material(s), generate exactly ${itemCount} multiple-choice questions with 4 options each.
+
+Rules:
+- Base your questions on the ACTUAL content provided in the context.
+- Do NOT make up information that isn't in the study material.
+- If multiple sources are provided (e.g., file + notes), combine information from both.
+- If only one source is provided, use only that source.
+- Each question should test understanding of a key concept from the material.
+- The correct answer should be factual based on the provided content.
+- Make the distractors plausible but clearly wrong.
+
+Return ONLY a JSON array of objects. Each question has: "question" (string), "options" (array of 4 strings), "answer" (index 0-3 of correct option). Example: [{"question":"What is X?","options":["A","B","C","D"],"answer":0}]`,
           },
-          { role: "user", content: combinedContent },
+          { role: "user", content: contextString },
         ],
       });
 
@@ -80,7 +173,11 @@ export async function POST(req: NextRequest) {
         quizQuestions = match ? JSON.parse(match[0]) : [];
       }
 
-      return NextResponse.json({ ok: true, quizQuestions: Array.isArray(quizQuestions) ? quizQuestions : [] });
+      return NextResponse.json({
+        ok: true,
+        quizQuestions: Array.isArray(quizQuestions) ? quizQuestions : [],
+        source: hasFileContent && hasNoteContent ? "file+notes" : hasFileContent ? "file" : "notes",
+      });
     }
   } catch (err) {
     console.error("[generate-study-materials] Failed:", err);

@@ -290,14 +290,41 @@ export default function NotesPage() {
     }
   };
 
+  // Build uploaded material context from attachments
+  const buildUploadedMaterial = () => {
+    const pdfAtt = attachments.find((a) => a.type === "pdf");
+    if (pdfAtt) {
+      return { type: "pdf" as const, extractedText: pdfText, url: undefined };
+    }
+    const pptxAtt = attachments.find((a) => a.type === "pptx");
+    if (pptxAtt) {
+      return { type: "powerpoint" as const, extractedText: `PowerPoint: ${pptxAtt.name} (${pptxAtt.size})`, url: undefined };
+    }
+    const videoAtt = attachments.find((a) => a.type === "video" || a.type === "url");
+    if (videoAtt) {
+      return { type: "video" as const, extractedText: undefined, url: videoAtt.url || videoAtt.name };
+    }
+    return undefined;
+  };
+
   // Anki generation
   const handleGenerateAnki = async () => {
+    // Check if at least one source exists
+    const hasFile = attachments.length > 0;
+    const hasNotes = newBody.trim().length > 0;
+    if (!hasFile && !hasNotes) return;
+
     setGeneratingAnki(true);
     try {
       const res = await fetch("/api/generate-study-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfText: attachments.find(a => a.type === "pdf") ? pdfText : "", noteContent: newBody, type: "anki", count: ankiCount }),
+        body: JSON.stringify({
+          generateType: "anki",
+          uploadedMaterial: buildUploadedMaterial(),
+          noteContent: newBody,
+          count: ankiCount,
+        }),
       });
       const data = await res.json();
       if (data.ankiCards?.length > 0) {
@@ -318,12 +345,22 @@ export default function NotesPage() {
 
   // Quiz generation
   const handleGenerateQuiz = async () => {
+    // Check if at least one source exists
+    const hasFile = attachments.length > 0;
+    const hasNotes = newBody.trim().length > 0;
+    if (!hasFile && !hasNotes) return;
+
     setGeneratingQuiz(true);
     try {
       const res = await fetch("/api/generate-study-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfText: attachments.find(a => a.type === "pdf") ? pdfText : "", noteContent: newBody, type: "quiz", count: quizCount }),
+        body: JSON.stringify({
+          generateType: "quiz",
+          uploadedMaterial: buildUploadedMaterial(),
+          noteContent: newBody,
+          count: quizCount,
+        }),
       });
       const data = await res.json();
       if (data.quizQuestions?.length > 0) {
