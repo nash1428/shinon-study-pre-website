@@ -100,7 +100,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Fetch both users
+    console.log(`[user-connections] action=${action} from=${currentUserId} to=${targetUserId}`);
+
+    // Fetch both users — try Firestore first, then in-memory registry
     let currentUser: RegisteredUser | null = null;
     let targetUser: RegisteredUser | null = null;
 
@@ -113,8 +115,17 @@ export async function POST(req: NextRequest) {
     if (!currentUser) currentUser = userRegistry.get(currentUserId) || null;
     if (!targetUser) targetUser = userRegistry.get(targetUserId) || null;
 
+    // If target not found anywhere, create a minimal entry in registry
     if (!targetUser) {
-      return NextResponse.json({ error: "Target user not found" }, { status: 404 });
+      console.log(`[user-connections] Target user ${targetUserId} not found, creating minimal entry`);
+      targetUser = {
+        id: targetUserId, name: "User", email: "", university: "",
+        avatarUrl: null, isPrivate: false, showTodayTasks: true, showTodaySchedule: true,
+        followers: [], following: [], friends: [],
+        friendRequests: [], incomingRequests: [], outgoingRequests: [],
+        focusCount: 0, focusMinutes: 0, totalPoints: 0,
+        registeredAt: new Date().toISOString(),
+      };
     }
 
     // Ensure current user exists

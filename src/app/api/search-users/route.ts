@@ -14,10 +14,34 @@ export async function POST(req: NextRequest) {
       firestoreUsers = await fetchAllUsersFromFirestore(idToken);
     }
 
-    // If Firestore returned nothing, use the in-memory registry
-    const sourceUsers = firestoreUsers.length > 0
-      ? firestoreUsers
-      : Array.from(userRegistry.values());
+    // MERGE: Always include in-memory registry users, prioritizing registry data
+    // (which has the latest connection updates from user-connections actions)
+    const registryUsers = Array.from(userRegistry.values());
+    const mergedUsersMap = new Map<string, RegisteredUser>();
+
+    // Start with Firestore users
+    firestoreUsers.forEach((u) => mergedUsersMap.set(u.id, u));
+
+    // Override/add with registry users (registry has latest connection state)
+    registryUsers.forEach((u) => {
+      const existing = mergedUsersMap.get(u.id);
+      if (existing) {
+        // Merge: registry takes priority for connection arrays
+        mergedUsersMap.set(u.id, {
+          ...existing,
+          friends: u.friends.length > existing.friends.length ? u.friends : existing.friends,
+          following: u.following.length > existing.following.length ? u.following : existing.following,
+          followers: u.followers.length > existing.followers.length ? u.followers : existing.followers,
+          incomingRequests: u.incomingRequests.length > existing.incomingRequests.length ? u.incomingRequests : (existing.incomingRequests || existing.friendRequests || []),
+          outgoingRequests: u.outgoingRequests.length > existing.outgoingRequests.length ? u.outgoingRequests : existing.outgoingRequests,
+          friendRequests: u.incomingRequests.length > (existing.friendRequests || []).length ? u.incomingRequests : (existing.friendRequests || []),
+        });
+      } else {
+        mergedUsersMap.set(u.id, u);
+      }
+    });
+
+    const sourceUsers = Array.from(mergedUsersMap.values());
 
     if (sourceUsers.length === 0) {
       return NextResponse.json({
@@ -28,15 +52,28 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Get current user's relationship data
-    const currentUserFromFirestore = firestoreUsers.find((u) => u.id === currentUserId);
+    // Get current user's relationship data — prioritize registry (latest updates)
     const currentUserFromRegistry = userRegistry.get(currentUserId);
-    const currentUserData = currentUserFromFirestore || currentUserFromRegistry;
+    const currentUserFromFirestore = firestoreUsers.find((u) => u.id === currentUserId);
 
-    const currentUserFriends = currentUserData?.friends || [];
-    const currentUserFollowing = currentUserData?.following || [];
-    const currentUserIncomingRequests = currentUserData?.incomingRequests || currentUserData?.friendRequests || [];
-    const currentUserOutgoingRequests = currentUserData?.outgoingRequests || [];
+    // Merge current user's data
+    const regFriends = currentUserFromRegistry?.friends ?? [];
+    const regFollowing = currentUserFromRegistry?.following ?? [];
+    const regIncoming = currentUserFromRegistry?.incomingRequests ?? [];
+    const regOutgoing = currentUserFromRegistry?.outgoingRequests ?? [];
+
+    const currentUserFriends = regFriends.length > 0
+      ? regFriends
+      : currentUserFromFirestore?.friends || [];
+    const currentUserFollowing = regFollowing.length > 0
+      ? regFollowing
+      : currentUserFromFirestore?.following || [];
+    const currentUserIncomingRequests = regIncoming.length > 0
+      ? regIncoming
+      : currentUserFromFirestore?.incomingRequests || currentUserFromFirestore?.friendRequests || [];
+    const currentUserOutgoingRequests = regOutgoing.length > 0
+      ? regOutgoing
+      : currentUserFromFirestore?.outgoingRequests || [];
 
     const results = sourceUsers
       .filter((user) => {
@@ -84,7 +121,7 @@ export async function POST(req: NextRequest) {
       users: results,
       incomingRequestCount: currentUserIncomingRequests.length,
       incomingRequests: incomingRequestUsers,
-      source: firestoreUsers.length > 0 ? "firestore" : "registry",
+      source: firestoreUsers.length > 0 ? "merged" : "registry",
       totalUsers: sourceUsers.length,
     });
   } catch (err) {
