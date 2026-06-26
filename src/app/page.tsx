@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import Sidebar, { type TabId } from "@/components/Sidebar";
 import LanguageToggle from "@/components/LanguageToggle";
-import GlobalSearch from "@/components/GlobalSearch";
 import FloatingChatbot from "@/components/FloatingChatbot";
 import HomePage from "@/components/pages/HomePage";
 import NotesPage from "@/components/pages/NotesPage";
@@ -74,9 +73,8 @@ function ProtectedApp() {
         }`}
         style={{ "--sidebar-width": sidebarCollapsed ? "4rem" : "16rem" } as React.CSSProperties}
       >
-        {/* Top header bar: Global Search (left) + Language toggle (right) */}
-        <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
-          <GlobalSearch />
+        {/* Top header bar: Language toggle (right) */}
+        <header className="sticky top-0 z-30 flex items-center justify-end border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
           <LanguageToggle />
         </header>
 
