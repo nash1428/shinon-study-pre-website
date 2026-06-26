@@ -10,6 +10,8 @@ interface RegisteredUser {
   university: string;
   avatarUrl: string | null;
   isPrivate: boolean;
+  showTodayTasks: boolean;
+  showTodaySchedule: boolean;
   followers: string[];
   following: string[];
   friends: string[];
@@ -37,6 +39,8 @@ async function fetchAllUsersFromFirestore(idToken: string): Promise<RegisteredUs
           university: data.university || "",
           avatarUrl: data.avatarUrl || null,
           isPrivate: data.isPrivate || false,
+          showTodayTasks: data.showTodayTasks ?? true,
+          showTodaySchedule: data.showTodaySchedule ?? true,
           followers: data.followers || [],
           following: data.following || [],
           friends: data.friends || [],
@@ -94,6 +98,8 @@ function parseFirestoreUser(id: string, fields: Record<string, unknown>): Regist
     university: getString("university"),
     avatarUrl,
     isPrivate: getBool("isPrivate"),
+    showTodayTasks: getBool("showTodayTasks") ?? true,
+    showTodaySchedule: getBool("showTodaySchedule") ?? true,
     followers: getArray("followers"),
     following: getArray("following"),
     friends: getArray("friends"),
@@ -117,6 +123,8 @@ function toFirestoreFields(user: RegisteredUser): Record<string, unknown> {
     email: stringField(user.email),
     university: stringField(user.university),
     isPrivate: { booleanValue: user.isPrivate },
+    showTodayTasks: { booleanValue: user.showTodayTasks },
+    showTodaySchedule: { booleanValue: user.showTodaySchedule },
     followers: arrayField(user.followers),
     following: arrayField(user.following),
     friends: arrayField(user.friends),
@@ -189,6 +197,8 @@ export async function POST(req: NextRequest) {
       university: profile?.university || existingData?.university || existing?.university || "",
       avatarUrl: profile?.avatarUrl ?? existingData?.avatarUrl ?? existing?.avatarUrl ?? null,
       isPrivate: profile?.isPrivate ?? existingData?.isPrivate ?? existing?.isPrivate ?? false,
+      showTodayTasks: profile?.showTodayTasks ?? existingData?.showTodayTasks ?? existing?.showTodayTasks ?? true,
+      showTodaySchedule: profile?.showTodaySchedule ?? existingData?.showTodaySchedule ?? existing?.showTodaySchedule ?? true,
       followers: existingData?.followers || existing?.followers || [],
       following: existingData?.following || existing?.following || [],
       friends: existingData?.friends || existing?.friends || [],
@@ -209,11 +219,12 @@ export async function POST(req: NextRequest) {
           university: userEntry.university,
           avatarUrl: userEntry.avatarUrl,
           isPrivate: userEntry.isPrivate,
+          showTodayTasks: userEntry.showTodayTasks,
+          showTodaySchedule: userEntry.showTodaySchedule,
           followers: userEntry.followers,
           following: userEntry.following,
           friends: userEntry.friends,
           friendRequests: userEntry.friendRequests,
-          registeredAt: userEntry.registeredAt,
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       } catch (err) {

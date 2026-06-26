@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { userRegistry, type RegisteredUser, parseFirestoreUser, toFirestoreFields, FIRESTORE_BASE } from "../register-user/route";
 
-type ActionType = "send_request" | "accept_request" | "reject_request" | "follow" | "unfollow";
+type ActionType = "send_request" | "accept_request" | "reject_request" | "follow" | "unfollow" | "unconnect";
 
 async function fetchUserFromFirestore(idToken: string, uid: string): Promise<RegisteredUser | null> {
   try {
@@ -64,8 +64,9 @@ export async function POST(req: NextRequest) {
     if (!currentUser) {
       currentUser = {
         id: currentUserId, name: "User", email: "", university: "",
-        avatarUrl: null, isPrivate: false, followers: [], following: [],
-        friends: [], friendRequests: [], registeredAt: new Date().toISOString(),
+        avatarUrl: null, isPrivate: false, showTodayTasks: true, showTodaySchedule: true,
+        followers: [], following: [], friends: [], friendRequests: [],
+        registeredAt: new Date().toISOString(),
       };
     }
 
@@ -128,6 +129,23 @@ export async function POST(req: NextRequest) {
           await saveUserToFirestore(idToken, targetUser);
         }
         return NextResponse.json({ ok: true, message: "Unfollowed" });
+      }
+
+      case "unconnect": {
+        // Remove from friends, followers, and following for both users
+        currentUser.friends = currentUser.friends.filter((id) => id !== targetUserId);
+        currentUser.followers = currentUser.followers.filter((id) => id !== targetUserId);
+        currentUser.following = currentUser.following.filter((id) => id !== targetUserId);
+        targetUser.friends = targetUser.friends.filter((id) => id !== currentUserId);
+        targetUser.followers = targetUser.followers.filter((id) => id !== currentUserId);
+        targetUser.following = targetUser.following.filter((id) => id !== currentUserId);
+        userRegistry.set(currentUser.id, currentUser);
+        userRegistry.set(targetUser.id, targetUser);
+        if (idToken) {
+          await saveUserToFirestore(idToken, currentUser);
+          await saveUserToFirestore(idToken, targetUser);
+        }
+        return NextResponse.json({ ok: true, message: "Disconnected" });
       }
 
       default:

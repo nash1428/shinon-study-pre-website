@@ -25,6 +25,8 @@ export interface UserProfile {
   location: string;
   isPrivate: boolean;
   avatarUrl: string | null;
+  showTodayTasks: boolean;
+  showTodaySchedule: boolean;
 }
 
 interface AuthContextValue {
@@ -57,6 +59,8 @@ const defaultProfile: UserProfile = {
   location: "",
   isPrivate: false,
   avatarUrl: null,
+  showTodayTasks: true,
+  showTodaySchedule: true,
 };
 
 // In-memory cache

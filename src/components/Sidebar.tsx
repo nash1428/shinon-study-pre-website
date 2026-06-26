@@ -27,7 +27,7 @@ const navItems: { id: TabId; labelKey: string; icon: typeof Home }[] = [
   { id: "search", labelKey: "sidebar.search", icon: Search },
 ];
 
-const profileFields: { key: keyof Omit<UserProfile, "isPrivate" | "avatarUrl">; labelKey: string }[] = [
+const profileFields: { key: keyof Omit<UserProfile, "isPrivate" | "avatarUrl" | "showTodayTasks" | "showTodaySchedule">; labelKey: string }[] = [
   { key: "name", labelKey: "profile.name" },
   { key: "university", labelKey: "profile.university" },
   { key: "semester", labelKey: "profile.semester" },
@@ -49,6 +49,8 @@ const defaultProfile: UserProfile = {
   location: "",
   isPrivate: false,
   avatarUrl: null,
+  showTodayTasks: true,
+  showTodaySchedule: true,
 };
 
 export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleCollapse, profileData }: SidebarProps) {
