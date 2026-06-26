@@ -410,7 +410,6 @@ export default function NotesPage() {
       });
       const data = await res.json();
       if (data.ankiCards?.length > 0) {
-        // Save to the note being created (create it first if not yet saved)
         const noteId = Date.now();
         const newNote: NoteItem = {
           id: noteId,
@@ -427,14 +426,19 @@ export default function NotesPage() {
         };
         setNotes([newNote, ...notes]);
         if (user) saveNoteToFirestore(user.uid, newNote).catch(() => {});
-        // Open the note in full-width view to see the flashcards
+        // Close modal first, then open the note after state updates
         closeModal();
-        setExpandedNoteId(noteId);
-        setFullWidthEditor(true);
-        setFlashcardIndex(0);
-        setFlashcardFlipped(false);
+        // Use setTimeout to ensure notes state has updated before opening
+        setTimeout(() => {
+          setExpandedNoteId(noteId);
+          setFullWidthEditor(true);
+          setFlashcardIndex(0);
+          setFlashcardFlipped(false);
+        }, 100);
       }
-    } catch {}
+    } catch (err) {
+      console.error("[generateAnki] Failed:", err);
+    }
     setGeneratingAnki(false);
   };
 
@@ -475,12 +479,16 @@ export default function NotesPage() {
         setNotes([newNote, ...notes]);
         if (user) saveNoteToFirestore(user.uid, newNote).catch(() => {});
         closeModal();
-        setExpandedNoteId(noteId);
-        setFullWidthEditor(true);
-        setFlashcardIndex(0);
-        setFlashcardFlipped(false);
+        setTimeout(() => {
+          setExpandedNoteId(noteId);
+          setFullWidthEditor(true);
+          setFlashcardIndex(0);
+          setFlashcardFlipped(false);
+        }, 100);
       }
-    } catch {}
+    } catch (err) {
+      console.error("[generateQuiz] Failed:", err);
+    }
     setGeneratingQuiz(false);
   };
 
@@ -603,7 +611,7 @@ export default function NotesPage() {
                       }
                     } catch {}
                     setGeneratingAnki(false);
-                  }} disabled={!editTitle.trim() || generatingAnki}
+                  }} disabled={(!editBody.trim() && attachments.length === 0) || generatingAnki}
                     className="flex w-full items-center justify-center gap-1 rounded-lg bg-moss px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
                     {generatingAnki ? <Loader2 className="h-3 w-3 animate-spin" /> : <Layers className="h-3 w-3" />}
                     {generatingAnki ? "..." : `Generate ${ankiCount}`}
@@ -638,7 +646,7 @@ export default function NotesPage() {
                       }
                     } catch {}
                     setGeneratingQuiz(false);
-                  }} disabled={!editTitle.trim() || generatingQuiz}
+                  }} disabled={(!editBody.trim() && attachments.length === 0) || generatingQuiz}
                     className="flex w-full items-center justify-center gap-1 rounded-lg bg-blue-500 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50">
                     {generatingQuiz ? <Loader2 className="h-3 w-3 animate-spin" /> : <HelpCircle className="h-3 w-3" />}
                     {generatingQuiz ? "..." : `Generate ${quizCount}`}
@@ -1037,7 +1045,7 @@ export default function NotesPage() {
                       onChange={(e) => setAnkiCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
                       className="w-10 rounded-md border border-ivory-deep bg-white px-1 py-0.5 text-[10px] text-ink focus:border-moss/30 focus:outline-none" />
                   </div>
-                  <button onClick={handleGenerateAnki} disabled={!newTitle.trim() || generatingAnki}
+                  <button onClick={handleGenerateAnki} disabled={(!newBody.trim() && attachments.length === 0) || generatingAnki}
                     className="flex w-full items-center justify-center gap-1 rounded-lg bg-moss px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-moss-dark disabled:opacity-50">
                     {generatingAnki ? <Loader2 className="h-3 w-3 animate-spin" /> : <Layers className="h-3 w-3" />}
                     {generatingAnki ? "..." : `Generate ${ankiCount}`}
@@ -1053,7 +1061,7 @@ export default function NotesPage() {
                       onChange={(e) => setQuizCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 5)))}
                       className="w-10 rounded-md border border-ivory-deep bg-white px-1 py-0.5 text-[10px] text-ink focus:border-blue-300 focus:outline-none" />
                   </div>
-                  <button onClick={handleGenerateQuiz} disabled={!newTitle.trim() || generatingQuiz}
+                  <button onClick={handleGenerateQuiz} disabled={(!newBody.trim() && attachments.length === 0) || generatingQuiz}
                     className="flex w-full items-center justify-center gap-1 rounded-lg bg-blue-500 px-2 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50">
                     {generatingQuiz ? <Loader2 className="h-3 w-3 animate-spin" /> : <HelpCircle className="h-3 w-3" />}
                     {generatingQuiz ? "..." : `Generate ${quizCount}`}
