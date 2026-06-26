@@ -87,11 +87,11 @@ export default function HomePage() {
   const daysInMonth = useMemo(() => new Date(viewYear, viewMonth + 1, 0).getDate(), [viewYear, viewMonth]);
   const firstDayOfMonth = useMemo(() => new Date(viewYear, viewMonth, 1).getDay(), [viewYear, viewMonth]);
 
-  // Calendar cells with leading/trailing dates (no nulls — grid is always full)
+  // Calendar cells with leading/trailing dates — only show weeks that contain current month dates
   const calendarCells: { day: number; month: number; year: number; isCurrentMonth: boolean }[] = useMemo(() => {
     const cells: { day: number; month: number; year: number; isCurrentMonth: boolean }[] = [];
     
-    // Leading dates from previous month
+    // Leading dates from previous month (only enough to fill the first week)
     const prevMonth = viewMonth === 0 ? 11 : viewMonth - 1;
     const prevMonthYear = viewMonth === 0 ? viewYear - 1 : viewYear;
     const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
@@ -105,11 +105,11 @@ export default function HomePage() {
       cells.push({ day: d, month: viewMonth, year: viewYear, isCurrentMonth: true });
     }
     
-    // Trailing dates from next month
+    // Trailing dates — only enough to complete the last week (max 6 days)
     const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1;
     const nextMonthYear = viewMonth === 11 ? viewYear + 1 : viewYear;
-    const remainingCells = 42 - cells.length; // 6 rows × 7 days = 42
-    for (let d = 1; d <= remainingCells; d++) {
+    const remainingInWeek = (7 - (cells.length % 7)) % 7; // Fill only the current week, not extra rows
+    for (let d = 1; d <= remainingInWeek; d++) {
       cells.push({ day: d, month: nextMonth, year: nextMonthYear, isCurrentMonth: false });
     }
     
@@ -163,9 +163,27 @@ export default function HomePage() {
         });
       });
     });
-    // Sort each day's events by time
+    // Sort each day's events by time (normalize different time formats)
     Object.keys(merged).forEach((key) => {
-      merged[key].sort((a, b) => a.time.localeCompare(b.time));
+      merged[key].sort((a, b) => {
+        // Convert times to comparable 24h format for sorting
+        const normalizeTime = (t: string): string => {
+          if (!t || t === "All day") return "99:99"; // Sort all-day events last
+          // Handle "09:00 AM" / "02:30 PM" format (Google Calendar)
+          const match12 = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+          if (match12) {
+            let h = parseInt(match12[1]);
+            const m = match12[2];
+            const period = match12[3].toUpperCase();
+            if (period === "PM" && h !== 12) h += 12;
+            if (period === "AM" && h === 12) h = 0;
+            return `${String(h).padStart(2, "0")}:${m}`;
+          }
+          // Handle "09:00" 24h format (local events)
+          return t;
+        };
+        return normalizeTime(a.time).localeCompare(normalizeTime(b.time));
+      });
     });
     return merged;
   }, [googleCal.isConnected, googleCal.eventsByDate, localEventsByDate]);
