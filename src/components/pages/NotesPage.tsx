@@ -190,18 +190,21 @@ export default function NotesPage() {
   };
 
   const handleToggleExpand = (id: number) => {
+    // All notes now open in full-width editor view
     const note = notes.find((n) => n.id === id);
-    if (note?.fullWidth && expandedNoteId === id) {
+    if (!note) return;
+    if (expandedNoteId === id && fullWidthEditor) {
+      // Already open, close it
       setFullWidthEditor(false);
       setExpandedNoteId(null);
       setEditingNoteId(null);
-    } else if (note?.fullWidth) {
+    } else {
+      // Open in full width
       setExpandedNoteId(id);
       setFullWidthEditor(true);
       setEditingNoteId(null);
-    } else {
-      setFullWidthEditor(false);
-      setExpandedNoteId(expandedNoteId === id ? null : id);
+      setFlashcardIndex(0);
+      setFlashcardFlipped(false);
     }
   };
 
@@ -387,9 +390,8 @@ export default function NotesPage() {
     return undefined;
   };
 
-  // Anki generation
+  // Anki generation — saves to the current note being created
   const handleGenerateAnki = async () => {
-    // Check if at least one source exists
     const hasFile = attachments.length > 0;
     const hasNotes = newBody.trim().length > 0;
     if (!hasFile && !hasNotes) return;
@@ -408,24 +410,36 @@ export default function NotesPage() {
       });
       const data = await res.json();
       if (data.ankiCards?.length > 0) {
-        const ankiNote: NoteItem = {
-          id: Date.now(), title: newTitle.trim() + " — Anki Cards",
+        // Save to the note being created (create it first if not yet saved)
+        const noteId = Date.now();
+        const newNote: NoteItem = {
+          id: noteId,
+          title: newTitle.trim() || "Untitled Note",
           date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          tag: "Anki", category: newCategory,
+          tag: "Note",
+          category: newCategory,
           excerpt: `${data.ankiCards.length} AI-generated flashcards`,
-          fullContent: data.ankiCards.map((c: AnkiCard) => `Q: ${c.front}\nA: ${c.back}`).join("\n\n"),
-          ankiCards: data.ankiCards, fullWidth: true,
+          fullContent: newBody.trim() || undefined,
+          fullWidth: true,
+          pdfData: attachments.find((a) => a.type === "pdf")?.data || undefined,
+          pdfName: attachments.find((a) => a.type === "pdf")?.name || undefined,
+          ankiCards: data.ankiCards,
         };
-        setNotes([ankiNote, ...notes]);
-        if (user) saveNoteToFirestore(user.uid, ankiNote).catch(() => {});
+        setNotes([newNote, ...notes]);
+        if (user) saveNoteToFirestore(user.uid, newNote).catch(() => {});
+        // Open the note in full-width view to see the flashcards
+        closeModal();
+        setExpandedNoteId(noteId);
+        setFullWidthEditor(true);
+        setFlashcardIndex(0);
+        setFlashcardFlipped(false);
       }
     } catch {}
     setGeneratingAnki(false);
   };
 
-  // Quiz generation
+  // Quiz generation — saves to the current note being created
   const handleGenerateQuiz = async () => {
-    // Check if at least one source exists
     const hasFile = attachments.length > 0;
     const hasNotes = newBody.trim().length > 0;
     if (!hasFile && !hasNotes) return;
@@ -444,16 +458,27 @@ export default function NotesPage() {
       });
       const data = await res.json();
       if (data.quizQuestions?.length > 0) {
-        const quizNote: NoteItem = {
-          id: Date.now(), title: newTitle.trim() + " — Quiz",
+        const noteId = Date.now();
+        const newNote: NoteItem = {
+          id: noteId,
+          title: newTitle.trim() || "Untitled Note",
           date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-          tag: "Quiz", category: newCategory,
+          tag: "Note",
+          category: newCategory,
           excerpt: `${data.quizQuestions.length} AI-generated questions`,
-          fullContent: data.quizQuestions.map((q: QuizQuestion, i: number) => `Q${i + 1}: ${q.question}\n${q.options.map((o: string, j: number) => `  ${j === q.answer ? "✓" : "•"} ${o}`).join("\n")}`).join("\n\n"),
-          quizQuestions: data.quizQuestions, fullWidth: true,
+          fullContent: newBody.trim() || undefined,
+          fullWidth: true,
+          pdfData: attachments.find((a) => a.type === "pdf")?.data || undefined,
+          pdfName: attachments.find((a) => a.type === "pdf")?.name || undefined,
+          quizQuestions: data.quizQuestions,
         };
-        setNotes([quizNote, ...notes]);
-        if (user) saveNoteToFirestore(user.uid, quizNote).catch(() => {});
+        setNotes([newNote, ...notes]);
+        if (user) saveNoteToFirestore(user.uid, newNote).catch(() => {});
+        closeModal();
+        setExpandedNoteId(noteId);
+        setFullWidthEditor(true);
+        setFlashcardIndex(0);
+        setFlashcardFlipped(false);
       }
     } catch {}
     setGeneratingQuiz(false);
@@ -570,6 +595,11 @@ export default function NotesPage() {
                       if (data.ankiCards?.length > 0) {
                         const updatedNotes = notes.map((n) => n.id === editingNoteId ? { ...n, ankiCards: data.ankiCards, fullContent: editBody.trim() || n.fullContent } : n);
                         setNotes(updatedNotes);
+                        // Save to Firestore
+                        if (user) {
+                          const updated = updatedNotes.find((n) => n.id === editingNoteId);
+                          if (updated) saveNoteToFirestore(user.uid, updated).catch(() => {});
+                        }
                       }
                     } catch {}
                     setGeneratingAnki(false);
@@ -600,6 +630,11 @@ export default function NotesPage() {
                       if (data.quizQuestions?.length > 0) {
                         const updatedNotes = notes.map((n) => n.id === editingNoteId ? { ...n, quizQuestions: data.quizQuestions, fullContent: editBody.trim() || n.fullContent } : n);
                         setNotes(updatedNotes);
+                        // Save to Firestore
+                        if (user) {
+                          const updated = updatedNotes.find((n) => n.id === editingNoteId);
+                          if (updated) saveNoteToFirestore(user.uid, updated).catch(() => {});
+                        }
                       }
                     } catch {}
                     setGeneratingQuiz(false);
@@ -864,80 +899,12 @@ export default function NotesPage() {
               <div className="flex-1 pr-8">
                 <h3 className="text-sm font-semibold text-ink">{note.title}</h3>
                 <p className="mt-1 text-xs text-ink-soft">
-                  {note.tag === "PDF" && note.pdfData ? "PDF lecture notes (click to view)" : note.excerpt}
+                  {note.ankiCards?.length ? `${note.ankiCards.length} flashcards` : note.quizQuestions?.length ? `${note.quizQuestions.length} quiz questions` : note.excerpt}
                 </p>
-                {note.fullWidth && (
-                  <span className="mt-1.5 inline-flex items-center gap-0.5 rounded-full bg-moss/5 px-1.5 py-0.5 text-[9px] text-moss">
-                    <AlignJustify className="h-2.5 w-2.5" /> Full Width
-                  </span>
-                )}
               </div>
             </div>
 
-            {expandedNoteId === note.id && !note.fullWidth && (
-              <div className="mt-4 border-t border-ivory-deep/30 pt-4" onClick={(e) => e.stopPropagation()}>
-                {/* Attachments viewer */}
-                {note.pdfData && (
-                  <div className="mb-3">
-                    <button
-                      onClick={() => setPreviewAttachment({
-                        id: note.id.toString(),
-                        name: note.pdfName || "PDF",
-                        type: "pdf",
-                        data: note.pdfData,
-                      })}
-                      className="mb-2 flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-100"
-                    >
-                      <FileUp className="h-3.5 w-3.5" /> {note.pdfName || "View PDF"}
-                    </button>
-                  </div>
-                )}
-
-                {/* Anki cards */}
-                {note.ankiCards && note.ankiCards.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {note.ankiCards.map((card, i) => (
-                      <div key={i} className="rounded-xl bg-ivory-warm/40 p-3">
-                        <p className="text-xs font-semibold text-ink">Q: {card.front}</p>
-                        <p className="mt-1 text-xs text-ink-soft">A: {card.back}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Quiz */}
-                {note.quizQuestions && note.quizQuestions.length > 0 && (
-                  <div className="mt-3 space-y-3">
-                    {note.quizQuestions.map((q, i) => (
-                      <div key={i} className="rounded-xl bg-blue-50/40 p-3">
-                        <p className="text-xs font-semibold text-ink">Q{i + 1}: {q.question}</p>
-                        <div className="mt-1.5 space-y-1">
-                          {q.options.map((opt, j) => (
-                            <p key={j} className={`text-xs ${j === q.answer ? "font-medium text-moss" : "text-ink-soft"}`}>
-                              {j === q.answer ? "✓ " : "• "}{opt}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Full content */}
-                {note.fullContent && (
-                  <p className="whitespace-pre-wrap text-xs text-ink-soft">{note.fullContent}</p>
-                )}
-
-                {!note.fullContent && !note.ankiCards && !note.quizQuestions && !note.pdfData && (
-                  <p className="text-xs text-ink-muted italic">This note has no additional content.</p>
-                )}
-              </div>
-            )}
-
-            {/* For full-width notes, show hint */}
-            {note.fullWidth && expandedNoteId !== note.id && (
-              <p className="mt-2 text-[10px] text-moss">Click to open in full width →</p>
-            )}
+            <p className="mt-2 text-[10px] text-moss">Click to open →</p>
 
             <div className="mt-4 flex items-center gap-1.5 text-xs text-ink-muted">
               <FileText className="h-3 w-3" /> {note.date}
