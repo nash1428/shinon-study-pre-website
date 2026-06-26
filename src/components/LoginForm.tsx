@@ -75,7 +75,7 @@ export default function LoginForm() {
             />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-ink">Study Garden</h1>
+            <h1 className="text-2xl font-bold text-ink">Study Garden</h1>
             <p className="text-xs text-ink-muted">{t("auth.subtitle")}</p>
           </div>
         </div>
