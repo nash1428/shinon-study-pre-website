@@ -16,6 +16,11 @@ interface RegisteredUser {
   following: string[];
   friends: string[];
   friendRequests: string[];
+  incomingRequests: string[];
+  outgoingRequests: string[];
+  focusCount: number;
+  focusMinutes: number;
+  totalPoints: number;
   registeredAt: string;
 }
 
@@ -45,6 +50,11 @@ async function fetchAllUsersFromFirestore(idToken: string): Promise<RegisteredUs
           following: data.following || [],
           friends: data.friends || [],
           friendRequests: data.friendRequests || [],
+          incomingRequests: data.incomingRequests || data.friendRequests || [],
+          outgoingRequests: data.outgoingRequests || [],
+          focusCount: data.focusCount || 0,
+          focusMinutes: data.focusMinutes || 0,
+          totalPoints: data.totalPoints || 0,
           registeredAt: data.registeredAt || data.updatedAt || "",
         } as RegisteredUser;
       });
@@ -103,7 +113,12 @@ function parseFirestoreUser(id: string, fields: Record<string, unknown>): Regist
     followers: getArray("followers"),
     following: getArray("following"),
     friends: getArray("friends"),
-    friendRequests: getArray("friendRequests"),
+    friendRequests: getArray("friendRequests") || getArray("incomingRequests"),
+    incomingRequests: getArray("incomingRequests") || getArray("friendRequests"),
+    outgoingRequests: getArray("outgoingRequests"),
+    focusCount: parseInt(getString("focusCount")) || 0,
+    focusMinutes: parseInt(getString("focusMinutes")) || 0,
+    totalPoints: parseInt(getString("totalPoints")) || 0,
     registeredAt: getString("registeredAt") || getString("updatedAt"),
   };
 }
@@ -128,7 +143,12 @@ function toFirestoreFields(user: RegisteredUser): Record<string, unknown> {
     followers: arrayField(user.followers),
     following: arrayField(user.following),
     friends: arrayField(user.friends),
-    friendRequests: arrayField(user.friendRequests),
+    friendRequests: arrayField(user.incomingRequests || user.friendRequests || []),
+    incomingRequests: arrayField(user.incomingRequests || user.friendRequests || []),
+    outgoingRequests: arrayField(user.outgoingRequests || []),
+    focusCount: { integerValue: user.focusCount || 0 },
+    focusMinutes: { integerValue: user.focusMinutes || 0 },
+    totalPoints: { integerValue: user.totalPoints || 0 },
     registeredAt: stringField(user.registeredAt || new Date().toISOString()),
     updatedAt: stringField(new Date().toISOString()),
   };
@@ -202,7 +222,12 @@ export async function POST(req: NextRequest) {
       followers: existingData?.followers || existing?.followers || [],
       following: existingData?.following || existing?.following || [],
       friends: existingData?.friends || existing?.friends || [],
-      friendRequests: existingData?.friendRequests || existing?.friendRequests || [],
+      friendRequests: existingData?.incomingRequests || existingData?.friendRequests || existing?.friendRequests || [],
+      incomingRequests: existingData?.incomingRequests || existingData?.friendRequests || existing?.friendRequests || [],
+      outgoingRequests: existingData?.outgoingRequests || existing?.outgoingRequests || [],
+      focusCount: profile?.focusCount ?? existingData?.focusCount ?? existing?.focusCount ?? 0,
+      focusMinutes: profile?.focusMinutes ?? existingData?.focusMinutes ?? existing?.focusMinutes ?? 0,
+      totalPoints: profile?.totalPoints ?? existingData?.totalPoints ?? existing?.totalPoints ?? 0,
       registeredAt: existingData?.registeredAt || existing?.registeredAt || new Date().toISOString(),
     };
 
@@ -224,7 +249,12 @@ export async function POST(req: NextRequest) {
           followers: userEntry.followers,
           following: userEntry.following,
           friends: userEntry.friends,
-          friendRequests: userEntry.friendRequests,
+          friendRequests: userEntry.incomingRequests || userEntry.friendRequests,
+          incomingRequests: userEntry.incomingRequests || userEntry.friendRequests,
+          outgoingRequests: userEntry.outgoingRequests,
+          focusCount: userEntry.focusCount,
+          focusMinutes: userEntry.focusMinutes,
+          totalPoints: userEntry.totalPoints,
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       } catch (err) {

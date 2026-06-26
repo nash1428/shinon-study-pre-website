@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
-import { userRegistry, parseFirestoreUser, FIRESTORE_BASE, type RegisteredUser } from "../register-user/route";
+import { userRegistry, type RegisteredUser, FIRESTORE_BASE } from "../register-user/route";
 
 interface FriendTask {
   id: string;
@@ -38,7 +38,12 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
           followers: data.followers || [],
           following: data.following || [],
           friends: data.friends || [],
-          friendRequests: data.friendRequests || [],
+          friendRequests: data.incomingRequests || data.friendRequests || [],
+          incomingRequests: data.incomingRequests || data.friendRequests || [],
+          outgoingRequests: data.outgoingRequests || [],
+          focusCount: data.focusCount || 0,
+          focusMinutes: data.focusMinutes || 0,
+          totalPoints: data.totalPoints || 0,
           registeredAt: data.registeredAt || data.updatedAt || "",
         };
       }
@@ -54,7 +59,10 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
       });
       if (res.ok) {
         const data = await res.json();
-        return parseFirestoreUser(uid, data.fields || {});
+        const fields = data.fields || {};
+        // Parse using the shared parseFirestoreUser
+        const { parseFirestoreUser } = await import("../register-user/route");
+        return parseFirestoreUser(uid, fields);
       }
     } catch {}
   }
@@ -71,8 +79,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Fetch the target user's profile (includes privacy settings)
-    const targetUser = await fetchUserFromFirestore(idToken, currentUserId);
+    // FIX: Fetch the TARGET user (was fetching currentUserId — that was the bug!)
+    const targetUser = await fetchUserFromFirestore(idToken, targetUserId);
 
     if (!targetUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -91,77 +99,70 @@ export async function POST(req: NextRequest) {
         events: [],
         showTodayTasks: false,
         showTodaySchedule: false,
+        studyStats: null,
       });
     }
 
-    // Privacy check: only return tasks/schedule if the user has enabled sharing
+    // Privacy settings
     const showTasks = targetUser.showTodayTasks;
     const showSchedule = targetUser.showTodaySchedule;
 
     let tasks: FriendTask[] = [];
     let events: FriendEvent[] = [];
 
-    // Fetch today's tasks (from localStorage — passed via the request or from Firestore)
-    // Since tasks are stored in localStorage on the client, we need to fetch from Firestore if available
-    if (showTasks) {
-      if (adminDb) {
-        try {
-          const tasksSnapshot = await adminDb.collection("tasks")
-            .where("userId", "==", targetUserId)
-            .limit(20)
-            .get();
-          const today = new Date().toDateString();
-          tasks = tasksSnapshot.docs
-            .map((d) => {
-              const data = d.data();
-              return {
-                id: d.id,
-                title: data.title || "",
-                done: data.done || false,
-                deadline: data.deadline || data.dueDate || "",
-                content: data.content || "",
-              } as FriendTask;
-            })
-            .filter((t) => {
-              if (!t.deadline) return true;
-              try {
-                return new Date(t.deadline).toDateString() === today;
-              } catch {
-                return true;
-              }
-            });
-        } catch {}
-      }
-
-      // Fallback: check in-memory registry for localStorage-based tasks (won't have other users' tasks)
-      // This is a limitation — tasks are currently stored in localStorage per-browser
+    // Fetch today's tasks from Firestore
+    if (showTasks && adminDb) {
+      try {
+        const tasksSnapshot = await adminDb.collection("tasks")
+          .where("userId", "==", targetUserId)
+          .limit(20)
+          .get();
+        const today = new Date().toDateString();
+        tasks = tasksSnapshot.docs
+          .map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              title: data.title || "",
+              done: data.done || false,
+              deadline: data.deadline || data.dueDate || "",
+              content: data.content || "",
+            } as FriendTask;
+          })
+          .filter((t) => {
+            if (!t.deadline) return true;
+            try {
+              return new Date(t.deadline).toDateString() === today;
+            } catch {
+              return true;
+            }
+          });
+      } catch {}
     }
 
-    // Fetch today's events
-    if (showSchedule) {
-      if (adminDb) {
-        try {
-          const eventsSnapshot = await adminDb.collection("events")
-            .where("userId", "==", targetUserId)
-            .limit(20)
-            .get();
-          const today = new Date();
-          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-          events = eventsSnapshot.docs
-            .map((d) => {
-              const data = d.data();
-              return {
-                id: d.id,
-                title: data.title || "",
-                date: data.date || "",
-                startTime: data.startTime || "",
-                endTime: data.endTime || "",
-                location: data.location || "",
-              } as FriendEvent;
-            })
-            .filter((e) => e.date === todayStr);
-        } catch {}
-      }
+    // Fetch today's events from Firestore
+    if (showSchedule && adminDb) {
+      try {
+        const eventsSnapshot = await adminDb.collection("events")
+          .where("userId", "==", targetUserId)
+          .limit(20)
+          .get();
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        events = eventsSnapshot.docs
+          .map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              title: data.title || "",
+              date: data.date || "",
+              startTime: data.startTime || "",
+              endTime: data.endTime || "",
+              location: data.location || "",
+            } as FriendEvent;
+          })
+          .filter((e) => e.date === todayStr);
+      } catch {}
     }
 
     return NextResponse.json({
@@ -171,6 +172,11 @@ export async function POST(req: NextRequest) {
       events: showSchedule ? events : [],
       showTodayTasks: showTasks,
       showTodaySchedule: showSchedule,
+      studyStats: {
+        focusCount: targetUser.focusCount || 0,
+        focusMinutes: targetUser.focusMinutes || 0,
+        totalPoints: targetUser.totalPoints || 0,
+      },
       isFriend,
       isFollowing,
     });

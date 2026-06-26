@@ -20,6 +20,18 @@ interface SearchResultUser {
   isFriend: boolean;
   isFollowing: boolean;
   hasPendingRequest: boolean;
+  focusCount?: number;
+  focusMinutes?: number;
+  totalPoints?: number;
+}
+
+interface IncomingRequestUser {
+  id: string;
+  name: string;
+  email: string;
+  university: string;
+  avatarUrl: string | null;
+  isPrivate: boolean;
 }
 
 interface FriendListUser {
@@ -82,13 +94,17 @@ export default function FriendPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Incoming friend requests
+  const [incomingRequests, setIncomingRequests] = useState<IncomingRequestUser[]>([]);
+  const [showRequests, setShowRequests] = useState(false);
+
   // Friend list (from Firestore)
   const [friendList, setFriendList] = useState<FriendListUser[]>([]);
   const [friendListLoading, setFriendListLoading] = useState(true);
 
   // Selected friend profile view
   const [selectedFriend, setSelectedFriend] = useState<FriendListUser | null>(null);
-  const [friendData, setFriendData] = useState<{ tasks: FriendTask[]; events: FriendEvent[]; showTodayTasks: boolean; showTodaySchedule: boolean } | null>(null);
+  const [friendData, setFriendData] = useState<{ tasks: FriendTask[]; events: FriendEvent[]; showTodayTasks: boolean; showTodaySchedule: boolean; studyStats?: { focusCount: number; focusMinutes: number; totalPoints: number } } | null>(null);
   const [friendDataLoading, setFriendDataLoading] = useState(false);
 
   // 3-dot menu for own profile
@@ -121,6 +137,9 @@ export default function FriendPage() {
             isPrivate: profile.isPrivate,
             showTodayTasks,
             showTodaySchedule,
+            focusCount,
+            focusMinutes,
+            totalPoints,
           },
         }),
       }).catch(() => {});
@@ -152,6 +171,10 @@ export default function FriendPage() {
           showTodayTasks: true, showTodaySchedule: true,
           isFriend: u.isFriend, isFollowing: u.isFollowing,
         })));
+        // Save incoming requests
+        if (data.incomingRequests) {
+          setIncomingRequests(data.incomingRequests);
+        }
       }
     } catch {}
     setFriendListLoading(false);
@@ -184,6 +207,7 @@ export default function FriendPage() {
           events: data.events || [],
           showTodayTasks: data.showTodayTasks,
           showTodaySchedule: data.showTodaySchedule,
+          studyStats: data.studyStats,
         });
       }
     } catch {}
@@ -251,6 +275,11 @@ export default function FriendPage() {
       if (action === "unconnect" || action === "unfollow") {
         setFriendList((prev) => prev.filter((f) => f.id !== targetUserId));
         if (selectedFriend?.id === targetUserId) setSelectedFriend(null);
+      }
+
+      // If accept/reject request, remove from incoming requests
+      if (action === "accept_request" || action === "reject_request") {
+        setIncomingRequests((prev) => prev.filter((r) => r.id !== targetUserId));
       }
 
       // If follow/connect, refresh friend list
@@ -354,7 +383,7 @@ export default function FriendPage() {
 
           {canView ? (
             <div className="mt-6 space-y-4">
-              {/* Study Statistics */}
+              {/* Study Statistics — from friend's real Firestore data */}
               <div>
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Study Statistics</h3>
                 <div className="grid grid-cols-3 gap-3">
@@ -363,21 +392,21 @@ export default function FriendPage() {
                       <Clock className="h-4 w-4" />
                       <span className="text-[10px] font-semibold uppercase tracking-wide">Study Time</span>
                     </div>
-                    <p className="mt-2 text-2xl font-bold text-ink">{formatStudyTime(focusMinutes)}</p>
+                    <p className="mt-2 text-2xl font-bold text-ink">{formatStudyTime(friendData?.studyStats?.focusMinutes ?? 0)}</p>
                   </div>
                   <div className="rounded-xl bg-gold/5 p-4">
                     <div className="flex items-center gap-2 text-gold-dark">
                       <Target className="h-4 w-4" />
                       <span className="text-[10px] font-semibold uppercase tracking-wide">Sessions</span>
                     </div>
-                    <p className="mt-2 text-2xl font-bold text-ink">{focusCount}</p>
+                    <p className="mt-2 text-2xl font-bold text-ink">{friendData?.studyStats?.focusCount ?? 0}</p>
                   </div>
                   <div className="rounded-xl bg-gold/10 p-4">
                     <div className="flex items-center gap-2 text-gold-dark">
                       <Flame className="h-4 w-4" />
                       <span className="text-[10px] font-semibold uppercase tracking-wide">Points</span>
                     </div>
-                    <p className="mt-2 text-2xl font-bold text-ink">{totalPoints}</p>
+                    <p className="mt-2 text-2xl font-bold text-ink">{friendData?.studyStats?.totalPoints ?? 0}</p>
                   </div>
                 </div>
               </div>
@@ -587,6 +616,49 @@ export default function FriendPage() {
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Focus Session</h2>
         <FocusTimer />
       </div>
+
+      {/* Incoming Friend Requests */}
+      {incomingRequests.length > 0 && (
+        <div>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Friend Requests</h2>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{incomingRequests.length}</span>
+          </div>
+          <div className="space-y-2">
+            {incomingRequests.map((reqUser) => (
+              <div key={reqUser.id} className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-[var(--shadow-card)]">
+                {reqUser.avatarUrl ? (
+                  <img src={reqUser.avatarUrl} alt={reqUser.name} className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/20 font-bold text-gold-dark">{reqUser.name?.[0] || "S"}</div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ink">{reqUser.name}</p>
+                  {reqUser.university && <p className="text-[11px] text-ink-muted"><GraduationCap className="inline h-3 w-3 mr-0.5" />{reqUser.university}</p>}
+                </div>
+                {actionLoading === reqUser.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-ink-muted" />
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleConnection("accept_request", reqUser.id)}
+                      className="flex items-center gap-1 rounded-lg bg-moss px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-moss-dark"
+                    >
+                      <UserCheck className="h-3.5 w-3.5" /> Accept
+                    </button>
+                    <button
+                      onClick={() => handleConnection("reject_request", reqUser.id)}
+                      className="flex items-center gap-1 rounded-lg border border-ivory-deep px-3 py-1.5 text-xs font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500 hover:border-red-200"
+                    >
+                      <X className="h-3.5 w-3.5" /> Decline
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Friend Search */}
       <div>
