@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -63,13 +63,47 @@ const defaultProfile: UserProfile = {
   showTodaySchedule: true,
 };
 
-// In-memory cache
-const profileCache = new Map<string, UserProfile>();
+// ====== STORAGE MANAGEMENT HELPERS ======
+// Per-user profile storage — each user gets their own key to prevent cross-account contamination
 
-/**
- * Save profile to Firestore via server-side API route (uses user's ID token).
- * This bypasses client-side SDK issues and works with proper security rules.
- */
+function getProfileKey(uid: string): string {
+  return `studyspace_profile_${uid}`;
+}
+
+function loadProfileFromStorage(uid: string): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(getProfileKey(uid));
+    if (!raw) return null;
+    const profile = JSON.parse(raw) as UserProfile;
+    // Safety check: verify the email matches (defense against stale data)
+    return profile;
+  } catch {
+    return null;
+  }
+}
+
+function saveProfileToStorage(uid: string, profile: UserProfile): void {
+  try {
+    localStorage.setItem(getProfileKey(uid), JSON.stringify(profile));
+  } catch {}
+}
+
+function clearAllProfileStorage(): void {
+  try {
+    // Remove all studyspace_profile_* keys
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("studyspace_profile_")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {}
+}
+
+// ====== SERVER PROFILE API HELPERS ======
+
 async function saveProfileToServer(idToken: string, uid: string, profile: UserProfile): Promise<void> {
   try {
     await fetch("/api/save-profile", {
@@ -82,9 +116,6 @@ async function saveProfileToServer(idToken: string, uid: string, profile: UserPr
   }
 }
 
-/**
- * Fetch profile from Firestore via server-side API route (uses user's ID token).
- */
 async function fetchProfileFromServer(idToken: string, uid: string): Promise<UserProfile | null> {
   try {
     const res = await fetch("/api/get-profile", {
@@ -107,86 +138,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch profile in background — never blocks UI
+  // ====== SESSION ISOLATION ======
+  // Track the active session to prevent stale async callbacks from overwriting data.
+  // Each login/signup/logout increments this counter. Async operations capture the
+  // value at start and bail out if it changed by the time they resolve.
+  const sessionRef = useRef(0);
+  const activeUidRef = useRef<string | null>(null);
+
+  // In-memory cache — keyed by UID, cleared on every login/logout
+  const profileCacheRef = useRef(new Map<string, UserProfile>());
+
+  // Fetch profile in background — guarded by session ID to prevent stale overwrites
   const fetchProfileInBackground = useCallback(async (firebaseUser: FirebaseUser) => {
     const uid = firebaseUser.uid;
+    const mySession = sessionRef.current;
     const fallback: Partial<UserProfile> = {
       email: firebaseUser.email || "",
       name: firebaseUser.displayName || "",
     };
 
-    // 1. Check in-memory cache (instant) — only for this user
-    if (profileCache.has(uid)) {
-      setProfile(profileCache.get(uid)!);
+    // GUARD: bail if session changed (e.g., user logged out or switched accounts)
+    const guardSession = () => {
+      if (sessionRef.current !== mySession || activeUidRef.current !== uid) {
+        return false;
+      }
+      return true;
+    };
+
+    // 1. Check in-memory cache
+    if (profileCacheRef.current.has(uid)) {
+      if (guardSession()) setProfile(profileCacheRef.current.get(uid)!);
       return;
     }
 
     // 2. Check per-user localStorage key
-    let localProfile: UserProfile | null = null;
-    try {
-      const backup = localStorage.getItem(`studyspace_profile_${uid}`);
-      if (backup) {
-        localProfile = JSON.parse(backup) as UserProfile;
-        profileCache.set(uid, localProfile);
-        setProfile(localProfile);
-      }
-    } catch {}
-
-    // 3. If no per-user profile, try migrating from old shared key
-    if (!localProfile) {
-      try {
-        const oldBackup = localStorage.getItem("studyspace_profile_backup");
-        if (oldBackup) {
-          const oldProfile = JSON.parse(oldBackup) as UserProfile;
-          // Only use old data if the email matches the current user
-          if (oldProfile.email === firebaseUser.email) {
-            localProfile = oldProfile;
-            profileCache.set(uid, localProfile);
-            setProfile(localProfile);
-            // Save to new per-user key
-            localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(localProfile));
-            // Don't delete the old key yet — keep as backup
-          }
-        }
-      } catch {}
+    let localProfile: UserProfile | null = loadProfileFromStorage(uid);
+    if (localProfile) {
+      profileCacheRef.current.set(uid, localProfile);
+      if (guardSession()) setProfile(localProfile);
     }
 
-    // 4. If still no profile, set a temp one from auth data so UI renders immediately
+    // 3. If no local profile, set a temp one from auth data so UI renders immediately
     if (!localProfile) {
       const tempProfile = { ...defaultProfile, ...fallback } as UserProfile;
-      setProfile(tempProfile);
+      if (guardSession()) setProfile(tempProfile);
     }
 
-    // 5. Try fetching from Firestore via server API (uses ID token for auth)
+    // 4. Try fetching from Firestore via server API (uses ID token for auth)
     try {
       const idToken = await firebaseUser.getIdToken();
+      if (!guardSession()) return; // Session changed while awaiting
+
       const serverProfile = await fetchProfileFromServer(idToken, uid);
+      if (!guardSession()) return; // Session changed while fetching
+
       if (serverProfile) {
-        profileCache.set(uid, serverProfile);
-        setProfile(serverProfile);
-        try {
-          localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(serverProfile));
-        } catch {}
+        profileCacheRef.current.set(uid, serverProfile);
+        if (guardSession()) setProfile(serverProfile);
+        saveProfileToStorage(uid, serverProfile);
       }
     } catch {
       // Server fetch failed — keep whatever we have from localStorage or temp
     }
 
-    // 6. Also try Firestore via client SDK as a secondary fallback
+    // 5. Also try Firestore via client SDK as a secondary fallback
     if (db) {
       try {
         const docRef = doc(db, "users", uid);
         const docSnap = await getDoc(docRef);
+        if (!guardSession()) return; // Session changed while awaiting
+
         if (docSnap.exists()) {
           const fetched = docSnap.data() as UserProfile;
-          profileCache.set(uid, fetched);
-          setProfile(fetched);
-          try {
-            localStorage.setItem(`studyspace_profile_${uid}`, JSON.stringify(fetched));
-          } catch {}
+          profileCacheRef.current.set(uid, fetched);
+          if (guardSession()) setProfile(fetched);
+          saveProfileToStorage(uid, fetched);
         }
       } catch {
-        // Firestore client SDK failed (likely security rules) — keep existing profile
+        // Firestore client SDK failed — keep existing profile
       }
     }
   }, []);
@@ -197,16 +226,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Set persistence synchronously (fast)
+    // Set persistence — use browserLocalPersistence so the session survives refresh
     setPersistence(auth, browserLocalPersistence).catch(() => {});
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      // Increment session ID on every auth state change to invalidate stale async ops
+      sessionRef.current++;
+      activeUidRef.current = firebaseUser?.uid || null;
+
       setUser(firebaseUser);
 
       if (firebaseUser) {
-        // Set loading=false IMMEDIATELY — don't wait for anything else
         setLoading(false);
-        // Fetch profile in background (non-blocking)
         fetchProfileInBackground(firebaseUser);
       } else {
         setProfile(null);
@@ -220,16 +251,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
 
-    // Clear any previous user's cached profile to prevent cross-account mixing
-    profileCache.clear();
-    setProfile(null);
+    // ====== CLEAN UP PREVIOUS SESSION ======
+    // Increment session to invalidate any pending async operations from the old user
+    sessionRef.current++;
+    activeUidRef.current = null;
 
-    // This triggers onAuthStateChanged automatically
+    // Clear in-memory cache completely
+    profileCacheRef.current.clear();
+
+    // Clear profile state immediately
+    setProfile(null);
+    setUser(null);
+    setLoading(true);
+
+    // Sign in — this triggers onAuthStateChanged, but we also set state optimistically
     const cred = await signInWithEmailAndPassword(auth, email, password);
 
-    // Optimistically set user + loading=false so the redirect is instant
+    // Update session tracking to the new user
+    sessionRef.current++;
+    activeUidRef.current = cred.user.uid;
+
+    // Set user + loading=false so the redirect is instant
     setUser(cred.user);
     setLoading(false);
+
+    // Fetch profile for the new user
     fetchProfileInBackground(cred.user);
 
     return cred.user;
@@ -237,17 +283,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = useCallback(async (email: string, password: string, name: string) => {
     if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
+
+    // ====== CLEAN UP PREVIOUS SESSION ======
+    sessionRef.current++;
+    activeUidRef.current = null;
+    profileCacheRef.current.clear();
+    setProfile(null);
+    setUser(null);
+
     const cred = await createUserWithEmailAndPassword(auth, email, password);
 
+    // Update session tracking
+    sessionRef.current++;
+    activeUidRef.current = cred.user.uid;
+
     if (cred.user) {
-      // updateProfile — non-blocking (don't let it hang the UI)
       updateProfile(cred.user, { displayName: name }).catch(() => {});
 
       const newProfile: UserProfile = { ...defaultProfile, email, name };
-      profileCache.set(cred.user.uid, newProfile);
-      try {
-        localStorage.setItem(`studyspace_profile_${cred.user.uid}`, JSON.stringify(newProfile));
-      } catch {}
+      profileCacheRef.current.set(cred.user.uid, newProfile);
+      saveProfileToStorage(cred.user.uid, newProfile);
 
       // Save to Firestore via server API
       try {
@@ -261,7 +316,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Optimistically set user + loading=false
     setUser(cred.user);
     setLoading(false);
 
@@ -270,39 +324,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     if (!isFirebaseConfigured || !auth) return;
-    profileCache.clear();
+
+    // ====== FULL SESSION CLEANUP ======
+    // Invalidate all pending async operations
+    sessionRef.current++;
+    activeUidRef.current = null;
+
+    // Clear in-memory cache
+    profileCacheRef.current.clear();
+
+    // Clear all profile storage (all per-user keys + old shared key)
+    clearAllProfileStorage();
+
+    // Clear React state
     setUser(null);
     setProfile(null);
     setLoading(true);
+
+    // Sign out from Firebase
     await signOut(auth);
   }, []);
 
   const saveProfile = useCallback(async (updatedProfile: UserProfile) => {
+    const currentUser = auth?.currentUser;
+    if (!currentUser) return;
+
+    // GUARD: only save if this is still the active user
+    if (activeUidRef.current !== currentUser.uid) return;
+
     // Update local state immediately
     setProfile(updatedProfile);
 
-    const currentUser = auth?.currentUser;
+    // Save to localStorage (per-user key)
+    saveProfileToStorage(currentUser.uid, updatedProfile);
 
-    // Always save to localStorage synchronously (per-user key)
+    // Update in-memory cache
+    profileCacheRef.current.set(currentUser.uid, updatedProfile);
+
+    // Save to Firestore via server API
     try {
-      if (currentUser) {
-        localStorage.setItem(`studyspace_profile_${currentUser.uid}`, JSON.stringify(updatedProfile));
-      }
+      const idToken = await currentUser.getIdToken();
+      // GUARD: check again after await
+      if (activeUidRef.current !== currentUser.uid) return;
+      saveProfileToServer(idToken, currentUser.uid, updatedProfile);
     } catch {}
 
-    if (currentUser) {
-      profileCache.set(currentUser.uid, updatedProfile);
-
-      // Save to Firestore via server API (uses ID token for auth)
-      try {
-        const idToken = await currentUser.getIdToken();
-        saveProfileToServer(idToken, currentUser.uid, updatedProfile);
-      } catch {}
-
-      // Also try client SDK as backup
-      if (db) {
-        setDoc(doc(db, "users", currentUser.uid), updatedProfile).catch(() => {});
-      }
+    // Also try client SDK as backup
+    if (db) {
+      setDoc(doc(db, "users", currentUser.uid), updatedProfile).catch(() => {});
     }
   }, []);
 
