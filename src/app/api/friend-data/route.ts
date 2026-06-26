@@ -20,7 +20,7 @@ interface FriendEvent {
 }
 
 async function fetchUserFromFirestore(idToken: string, uid: string): Promise<RegisteredUser | null> {
-  // Try Admin SDK first
+  // Try Admin SDK first (bypasses security rules)
   if (adminDb) {
     try {
       const docSnap = await adminDb.collection("users").doc(uid).get();
@@ -47,7 +47,9 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
           registeredAt: data.registeredAt || data.updatedAt || "",
         };
       }
-    } catch {}
+    } catch (err) {
+      console.warn("[friend-data] Admin SDK fetch failed:", err);
+    }
   }
 
   // Fallback to REST API
@@ -60,9 +62,42 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
       if (res.ok) {
         const data = await res.json();
         const fields = data.fields || {};
-        // Parse using the shared parseFirestoreUser
-        const { parseFirestoreUser } = await import("../register-user/route");
-        return parseFirestoreUser(uid, fields);
+        // Inline parse to avoid dynamic import issues
+        const getString = (key: string): string => {
+          const v = fields[key] as { stringValue?: string } | undefined;
+          return v?.stringValue || "";
+        };
+        const getBool = (key: string): boolean => {
+          const v = fields[key] as { booleanValue?: boolean } | undefined;
+          return v?.booleanValue || false;
+        };
+        const getArray = (key: string): string[] => {
+          const v = fields[key] as { arrayValue?: { values?: { stringValue: string }[] } } | undefined;
+          if (!v?.arrayValue?.values) return [];
+          return v.arrayValue.values.map((item) => item.stringValue).filter(Boolean);
+        };
+        const avatarField = fields["avatarUrl"] as { stringValue?: string; nullValue?: unknown } | undefined;
+        const avatarUrl = avatarField?.nullValue !== undefined ? null : (avatarField?.stringValue || null);
+        return {
+          id: uid,
+          name: getString("name"),
+          email: getString("email"),
+          university: getString("university"),
+          avatarUrl,
+          isPrivate: getBool("isPrivate"),
+          showTodayTasks: getBool("showTodayTasks") ?? true,
+          showTodaySchedule: getBool("showTodaySchedule") ?? true,
+          followers: getArray("followers"),
+          following: getArray("following"),
+          friends: getArray("friends"),
+          friendRequests: getArray("incomingRequests") || getArray("friendRequests"),
+          incomingRequests: getArray("incomingRequests") || getArray("friendRequests"),
+          outgoingRequests: getArray("outgoingRequests"),
+          focusCount: parseInt(getString("focusCount")) || 0,
+          focusMinutes: parseInt(getString("focusMinutes")) || 0,
+          totalPoints: parseInt(getString("totalPoints")) || 0,
+          registeredAt: getString("registeredAt") || getString("updatedAt"),
+        };
       }
     } catch {}
   }
@@ -79,14 +114,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // FIX: Fetch the TARGET user (was fetching currentUserId — that was the bug!)
+    // Fetch the TARGET user's profile (includes privacy settings + friends list)
     const targetUser = await fetchUserFromFirestore(idToken, targetUserId);
 
     if (!targetUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Check if current user can view this profile
+    // Permission check: verify the requesting user is a friend or following
     const isFriend = targetUser.friends.includes(currentUserId);
     const isFollowing = targetUser.following.includes(currentUserId);
     const canViewProfile = !targetUser.isPrivate || isFriend || isFollowing;
@@ -100,6 +135,8 @@ export async function POST(req: NextRequest) {
         showTodayTasks: false,
         showTodaySchedule: false,
         studyStats: null,
+        isFriend,
+        isFollowing,
       });
     }
 
@@ -137,7 +174,9 @@ export async function POST(req: NextRequest) {
               return true;
             }
           });
-      } catch {}
+      } catch (err) {
+        console.warn("[friend-data] Tasks fetch failed:", err);
+      }
     }
 
     // Fetch today's events from Firestore
@@ -162,7 +201,9 @@ export async function POST(req: NextRequest) {
             } as FriendEvent;
           })
           .filter((e) => e.date === todayStr);
-      } catch {}
+      } catch (err) {
+        console.warn("[friend-data] Events fetch failed:", err);
+      }
     }
 
     return NextResponse.json({

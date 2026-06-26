@@ -4,6 +4,8 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 let adminDb: Firestore | null = null;
 let adminInitialized = false;
 
+const FIREBASE_PROJECT_ID = "study-space-aeb52";
+
 function initAdmin() {
   if (adminInitialized) return;
   adminInitialized = true;
@@ -21,10 +23,13 @@ function initAdmin() {
       return;
     }
 
-    // Try Application Default Credentials (works on Google Cloud / bld)
-    const app: App = getApps().length === 0 ? initializeApp() : getApps()[0];
+    // Try Application Default Credentials with explicit project ID
+    // On bld, ADC is available but project ID detection fails, so we set it explicitly
+    const app: App = getApps().length === 0
+      ? initializeApp({ projectId: FIREBASE_PROJECT_ID })
+      : getApps()[0];
     adminDb = getFirestore(app);
-    console.log("[firebase-admin] Initialized with default credentials");
+    console.log("[firebase-admin] Initialized with default credentials + project ID:", FIREBASE_PROJECT_ID);
   } catch (err) {
     console.warn("[firebase-admin] Initialization failed:", err);
   }

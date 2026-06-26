@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import {
   FileText, Plus, Upload, Layers, X, FileUp, HelpCircle,
-  AlignJustify, Columns2, Trash2, Mic, Loader2, ListPlus, ChevronLeft, ChevronRight, Pencil, Check, Settings2,
+  Trash2, Mic, Loader2, ListPlus, ChevronLeft, ChevronRight, Pencil, Check, Settings2,
   Video, Play, Link2, File,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -12,9 +12,9 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useAuth } from "@/lib/AuthContext";
 import { saveNoteToFirestore, saveTaskToFirestore } from "@/lib/notesService";
 
-type WidthMode = "standard" | "full";
+type WidthMode = "standard";
 
-const initialCategories = ["Finance", "Computer Science", "Mathematics", "Japanese", "General"];
+const initialCategories: string[] = [];
 
 export default function NotesPage() {
   const { t } = useTranslation();
@@ -26,7 +26,7 @@ export default function NotesPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
   const [widthMode, setWidthMode] = useState<WidthMode>("standard");
-  const [newCategory, setNewCategory] = useState("General");
+  const [newCategory, setNewCategory] = useState("");
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
 
@@ -52,7 +52,7 @@ export default function NotesPage() {
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
-  const [editCategory, setEditCategory] = useState("General");
+  const [editCategory, setEditCategory] = useState("");
 
   // Flashcard deck state
   const [flashcardIndex, setFlashcardIndex] = useState(0);
@@ -85,14 +85,13 @@ export default function NotesPage() {
   // Filter notes by category
   const filteredNotes = activeCategory === "All"
     ? notes
-    : notes.filter((n) => (n.category || "General") === activeCategory);
+    : notes.filter((n) => (n.category || "") === activeCategory);
 
   const closeModal = () => {
     setModalOpen(false);
     setNewTitle("");
     setNewBody("");
-    setWidthMode("standard");
-    setNewCategory("General");
+    setNewCategory("");
     setAttachments([]);
     setVideoUrl("");
     setShowVideoUrlInput(false);
@@ -131,10 +130,10 @@ export default function NotesPage() {
 
   const handleDeleteCategory = (cat: string) => {
     setCategories(categories.filter((c) => c !== cat));
-    // Reassign notes from deleted category to "General"
-    setNotes(notes.map((n) => (n.category === cat ? { ...n, category: "General" } : n)));
+    // Clear the category from notes that used it
+    setNotes(notes.map((n) => (n.category === cat ? { ...n, category: "" } : n)));
     if (activeCategory === cat) setActiveCategory("All");
-    if (newCategory === cat) setNewCategory("General");
+    if (newCategory === cat) setNewCategory("");
   };
 
   // Inline task creation — saves to localStorage (Task Tracker) + Firestore
@@ -167,10 +166,10 @@ export default function NotesPage() {
       title: newTitle.trim(),
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       tag,
-      category: newCategory,
+      category: newCategory.trim() || "",
       excerpt: newBody.trim().slice(0, 80) + (newBody.trim().length > 80 ? "..." : "") || (attachments.length > 0 ? `${attachments.length} attachment(s)` : "Click to view..."),
       fullContent: newBody.trim() || undefined,
-      fullWidth: widthMode === "full",
+      fullWidth: true,
       pdfData: firstPdf?.data || undefined,
       pdfName: firstPdf?.name || undefined,
     };
@@ -544,10 +543,9 @@ export default function NotesPage() {
               <FileText className="h-3 w-3" />
               {expandedNote.date}
               {isEditing ? (
-                <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)}
-                  className="rounded-lg border border-ivory-deep bg-white px-2 py-0.5 text-xs text-ink focus:border-moss/30 focus:outline-none">
-                  {categories.map((cat) => (<option key={cat} value={cat}>{cat}</option>))}
-                </select>
+                <input type="text" value={editCategory} onChange={(e) => setEditCategory(e.target.value)}
+                  placeholder="Category" list="category-list"
+                  className="rounded-lg border border-ivory-deep bg-white px-2 py-0.5 text-xs text-ink focus:border-moss/30 focus:outline-none" />
               ) : (
                 expandedNote.category && <span className="rounded-full bg-ivory-warm px-2 py-0.5 text-[9px]">{expandedNote.category}</span>
               )}
@@ -926,26 +924,12 @@ export default function NotesPage() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4" onClick={closeModal}>
           <div
-            className={`rounded-2xl bg-white p-7 shadow-[var(--shadow-float)] transition-all ${
-              widthMode === "full" ? "w-full max-w-4xl" : "w-full max-w-xl"
-            }`}
+            className="w-full max-w-xl rounded-2xl bg-white p-7 shadow-[var(--shadow-float)] transition-all"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-ink">New Note</h2>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setWidthMode(widthMode === "full" ? "standard" : "full")}
-                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
-                    widthMode === "full"
-                      ? "border-sage-300 bg-moss/5 text-moss"
-                      : "border-ivory-deep text-ink-muted hover:bg-ivory-warm/50"
-                  }`}
-                  title={widthMode === "full" ? "Full width (opens as full-screen panel)" : "Standard width"}
-                >
-                  {widthMode === "full" ? <AlignJustify className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
-                  {widthMode === "full" ? "Full Width" : "Standard"}
-                </button>
                 <button onClick={closeModal} className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-ivory-warm">
                   <X className="h-4 w-4" />
                 </button>
@@ -962,12 +946,11 @@ export default function NotesPage() {
                 </div>
                 <div className="w-40">
                   <label className="mb-1.5 block text-xs font-medium text-ink-muted">Category</label>
-                  <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full rounded-xl border border-ivory-deep bg-white px-3 py-3 text-sm text-ink focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10">
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="Type or select..."
+                    list="category-list" className="w-full rounded-xl border border-ivory-deep bg-white px-3 py-3 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10" />
+                  <datalist id="category-list">
+                    {categories.map((cat) => (<option key={cat} value={cat} />))}
+                  </datalist>
                 </div>
               </div>
 
@@ -1090,9 +1073,7 @@ export default function NotesPage() {
                   onChange={(e) => setNewBody(e.target.value)}
                   placeholder="Type your note content here, or use Audio Summary to generate from audio..."
                   rows={6}
-                  className={`w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10 resize-y ${
-                    widthMode === "full" ? "min-h-[300px]" : "min-h-[160px]"
-                  }`}
+                  className="w-full rounded-xl border border-ivory-deep bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10 resize-y min-h-[160px]"
                 />
               </div>
 
