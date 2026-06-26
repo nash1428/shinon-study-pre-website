@@ -87,12 +87,34 @@ export default function HomePage() {
   const daysInMonth = useMemo(() => new Date(viewYear, viewMonth + 1, 0).getDate(), [viewYear, viewMonth]);
   const firstDayOfMonth = useMemo(() => new Date(viewYear, viewMonth, 1).getDay(), [viewYear, viewMonth]);
 
-  const calendarCells: (number | null)[] = useMemo(() => {
-    const cells: (number | null)[] = [];
-    for (let i = 0; i < firstDayOfMonth; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  // Calendar cells with leading/trailing dates (no nulls — grid is always full)
+  const calendarCells: { day: number; month: number; year: number; isCurrentMonth: boolean }[] = useMemo(() => {
+    const cells: { day: number; month: number; year: number; isCurrentMonth: boolean }[] = [];
+    
+    // Leading dates from previous month
+    const prevMonth = viewMonth === 0 ? 11 : viewMonth - 1;
+    const prevMonthYear = viewMonth === 0 ? viewYear - 1 : viewYear;
+    const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
+    for (let i = firstDayOfMonth - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      cells.push({ day: d, month: prevMonth, year: prevMonthYear, isCurrentMonth: false });
+    }
+    
+    // Current month dates
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ day: d, month: viewMonth, year: viewYear, isCurrentMonth: true });
+    }
+    
+    // Trailing dates from next month
+    const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1;
+    const nextMonthYear = viewMonth === 11 ? viewYear + 1 : viewYear;
+    const remainingCells = 42 - cells.length; // 6 rows × 7 days = 42
+    for (let d = 1; d <= remainingCells; d++) {
+      cells.push({ day: d, month: nextMonth, year: nextMonthYear, isCurrentMonth: false });
+    }
+    
     return cells;
-  }, [firstDayOfMonth, daysInMonth]);
+  }, [firstDayOfMonth, daysInMonth, viewMonth, viewYear]);
 
   // Build a map of local events by dateKey
   const localEventsByDate = useMemo(() => {
@@ -152,12 +174,10 @@ export default function HomePage() {
   const canGoNext = useMemo(() => viewYear < maxDate.getFullYear() || (viewYear === maxDate.getFullYear() && viewMonth < maxDate.getMonth()), [viewYear, viewMonth, maxDate]);
 
   const handlePrevMonth = () => {
-    if (!canGoPrev) return;
     if (viewMonth === 0) { setViewMonth(11); setViewYear(viewYear - 1); } else setViewMonth(viewMonth - 1);
     setSelectedDateKey(null);
   };
   const handleNextMonth = () => {
-    if (!canGoNext) return;
     if (viewMonth === 11) { setViewMonth(0); setViewYear(viewYear + 1); } else setViewMonth(viewMonth + 1);
     setSelectedDateKey(null);
   };
@@ -339,9 +359,8 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-7 gap-1">
-              {calendarCells.map((day, i) => {
-                if (day === null) return <div key={i} />;
-                const key = dateKey(viewYear, viewMonth, day);
+              {calendarCells.map((cell, i) => {
+                const key = dateKey(cell.year, cell.month, cell.day);
                 const dayEvents = mergedEvents[key];
                 const hasEvent = !!dayEvents;
                 const isToday = key === todayKey;
@@ -352,8 +371,9 @@ export default function HomePage() {
                       isSelected ? "bg-moss font-bold text-white shadow-[var(--shadow-soft)]"
                       : isToday ? "bg-moss/10 font-bold text-moss ring-1 ring-moss/30"
                       : hasEvent ? "bg-gold/5 font-medium text-moss hover:bg-gold/10 cursor-pointer"
-                      : "text-ink-muted hover:bg-ivory-warm/50"}`}>
-                    {day}
+                      : cell.isCurrentMonth ? "text-ink hover:bg-ivory-warm/50 cursor-pointer"
+                      : "text-ink-muted/40 hover:bg-ivory-warm/30 cursor-pointer"}`}>
+                    {cell.day}
                     {hasEvent && !isSelected && !isToday && <div className="absolute bottom-1 h-1 w-1 rounded-full bg-gold" />}
                   </button>
                 );
@@ -401,7 +421,6 @@ export default function HomePage() {
             <div className="mt-4 flex items-center gap-4 border-t border-ivory-deep/40 pt-3">
               <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-moss" /><span className="text-[11px] text-ink-muted">{t("home.calendar.today")}</span></div>
               <div className="flex items-center gap-1.5"><div className="h-1 w-1 rounded-full bg-gold" /><span className="text-[11px] text-ink-muted">{t("home.calendar.hasEvents")}</span></div>
-              <div className="flex items-center gap-1.5"><div className="h-1 w-1 rounded-full bg-moss" /><span className="text-[11px] text-ink-muted">Local</span></div>
             </div>
           </div>
         </div>
