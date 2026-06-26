@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
 
     if (type === "anki") {
       const completion = await client.chat.completions.create({
-        model: "openai/gpt-oss-120b",
+        model: "zai-org/glm-5.2",
         messages: [
           {
             role: "system",
@@ -143,7 +143,7 @@ Return ONLY a JSON array of objects with "front" and "back" fields. Example: [{"
       });
     } else {
       const completion = await client.chat.completions.create({
-        model: "openai/gpt-oss-120b",
+        model: "zai-org/glm-5.2",
         messages: [
           {
             role: "system",

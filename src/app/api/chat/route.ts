@@ -228,7 +228,7 @@ ${contextString}`;
       ];
 
       const followUpCompletion = await client.chat.completions.create({
-        model: "openai/gpt-oss-120b",
+      model: "zai-org/glm-5.2",
         messages: followUpMessages,
         max_tokens: 400,
       });
