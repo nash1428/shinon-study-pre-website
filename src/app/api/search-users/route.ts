@@ -5,13 +5,10 @@ export async function POST(req: NextRequest) {
   try {
     const { searchTerm, currentUserId, idToken } = await req.json();
 
-    if (!searchTerm || searchTerm.trim().length < 2) {
-      return NextResponse.json({ ok: true, users: [] });
-    }
+    const term = (searchTerm || "").toLowerCase().trim();
+    const isListAll = !term || term.length < 2;
 
-    const term = searchTerm.toLowerCase().trim();
-
-    // Try Firestore REST API first (uses user's ID token)
+    // Try Firestore first (via Admin SDK — bypasses security rules)
     let firestoreUsers: RegisteredUser[] = [];
     if (idToken) {
       firestoreUsers = await fetchAllUsersFromFirestore(idToken);
@@ -31,7 +28,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Get current user's relationship data
-    // Try Firestore first, then in-memory registry
     let currentUserFriends: string[] = [];
     let currentUserFollowing: string[] = [];
     let currentUserRequests: string[] = [];
@@ -49,6 +45,9 @@ export async function POST(req: NextRequest) {
     const results = sourceUsers
       .filter((user) => {
         if (user.id === currentUserId) return false;
+        // If listing all (empty search), return everyone
+        if (isListAll) return true;
+        // Otherwise filter by name or email
         return (
           user.name.toLowerCase().includes(term) ||
           user.email.toLowerCase().includes(term)
@@ -65,7 +64,7 @@ export async function POST(req: NextRequest) {
         isFollowing: currentUserFollowing.includes(user.id),
         hasPendingRequest: currentUserRequests.includes(user.id) || (user.friendRequests || []).includes(currentUserId) || false,
       }))
-      .slice(0, 10);
+      .slice(0, isListAll ? 50 : 10);
 
     return NextResponse.json({
       ok: true,
