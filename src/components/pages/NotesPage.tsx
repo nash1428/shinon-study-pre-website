@@ -413,7 +413,7 @@ export default function NotesPage() {
           pdfName: attachments.find((a) => a.type === "pdf")?.name || undefined,
           ankiCards: data.ankiCards,
         };
-        setNotes([newNote, ...notes]);
+        setNotes(prevNotes => [newNote, ...prevNotes]);
         if (user) saveNoteToFirestore(user.uid, newNote).catch(() => {});
         // Close modal first, then open the note after state updates
         closeModal();
@@ -465,7 +465,7 @@ export default function NotesPage() {
           pdfName: attachments.find((a) => a.type === "pdf")?.name || undefined,
           quizQuestions: data.quizQuestions,
         };
-        setNotes([newNote, ...notes]);
+        setNotes(prevNotes => [newNote, ...prevNotes]);
         if (user) saveNoteToFirestore(user.uid, newNote).catch(() => {});
         closeModal();
         setTimeout(() => {
@@ -792,12 +792,11 @@ export default function NotesPage() {
                         body: JSON.stringify({ generateType: "anki", uploadedMaterial: buildUploadedMaterial(), noteContent: expandedNote.fullContent || "", count: ankiCount }),
                       });
                       const data = await res.json();
+                      console.log("[generateAnki edit] Response:", data.ankiCards?.length, "cards");
                       if (data.ankiCards?.length > 0) {
-                        const updatedNotes = notes.map((n) => n.id === expandedNote.id ? { ...n, ankiCards: data.ankiCards } : n);
-                        setNotes(updatedNotes);
+                        setNotes(prevNotes => prevNotes.map((n) => n.id === expandedNote.id ? { ...n, ankiCards: data.ankiCards } : n));
                         if (user) {
-                          const updated = updatedNotes.find((n) => n.id === expandedNote.id);
-                          if (updated) saveNoteToFirestore(user.uid, updated).catch(() => {});
+                          saveNoteToFirestore(user.uid, { ...expandedNote, ankiCards: data.ankiCards }).catch(() => {});
                         }
                         setFlashcardIndex(0);
                         setFlashcardFlipped(false);
@@ -829,12 +828,11 @@ export default function NotesPage() {
                         body: JSON.stringify({ generateType: "quiz", uploadedMaterial: buildUploadedMaterial(), noteContent: expandedNote.fullContent || "", count: quizCount }),
                       });
                       const data = await res.json();
+                      console.log("[generateQuiz edit] Response:", data.quizQuestions?.length, "questions");
                       if (data.quizQuestions?.length > 0) {
-                        const updatedNotes = notes.map((n) => n.id === expandedNote.id ? { ...n, quizQuestions: data.quizQuestions } : n);
-                        setNotes(updatedNotes);
+                        setNotes(prevNotes => prevNotes.map((n) => n.id === expandedNote.id ? { ...n, quizQuestions: data.quizQuestions } : n));
                         if (user) {
-                          const updated = updatedNotes.find((n) => n.id === expandedNote.id);
-                          if (updated) saveNoteToFirestore(user.uid, updated).catch(() => {});
+                          saveNoteToFirestore(user.uid, { ...expandedNote, quizQuestions: data.quizQuestions }).catch(() => {});
                         }
                         setQuizAnswers({});
                         setNoteViewMode("view");
