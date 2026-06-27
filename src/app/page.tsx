@@ -127,7 +127,9 @@ function ProtectedApp() {
         {/* Top header bar: Focus Session widget (left) + Language toggle (right) */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
           <FocusSessionWidget />
-          <LanguageToggle />
+          <div className="ml-auto">
+            <LanguageToggle />
+          </div>
         </header>
 
         <div className="mx-auto max-w-6xl px-10 py-8">
