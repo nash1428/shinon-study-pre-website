@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
 const FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/study-space-aeb52/databases/(default)/documents";
 
@@ -10,6 +11,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Try Admin SDK first (bypasses security rules)
+    if (adminDb) {
+      try {
+        const docSnap = await adminDb.collection("users").doc(uid).get();
+        if (docSnap.exists) {
+          const data = docSnap.data()!;
+          const profile: Record<string, string | boolean | null> = {};
+          for (const [key, value] of Object.entries(data)) {
+            if (value === null || value === undefined) {
+              profile[key] = null;
+            } else if (typeof value === "boolean") {
+              profile[key] = value;
+            } else {
+              profile[key] = String(value);
+            }
+          }
+          console.log("[get-profile] Found via Admin SDK for", uid);
+          return NextResponse.json({ ok: true, profile });
+        }
+        // Not found
+        return NextResponse.json({ ok: true, profile: null });
+      } catch (err) {
+        console.warn("[get-profile] Admin SDK failed, trying REST API");
+      }
+    }
+
+    // Fallback: Firestore REST API with ID token
     const res = await fetch(`${FIRESTORE_BASE}/users/${uid}`, {
       method: "GET",
       headers: {
@@ -18,7 +46,6 @@ export async function POST(req: NextRequest) {
     });
 
     if (res.status === 404) {
-      // Profile doesn't exist yet
       return NextResponse.json({ ok: true, profile: null });
     }
 
@@ -44,6 +71,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log("[get-profile] Found via REST API for", uid);
     return NextResponse.json({ ok: true, profile });
   } catch (err) {
     console.error("[get-profile] Failed:", err);

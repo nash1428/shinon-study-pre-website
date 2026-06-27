@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
 const FIRESTORE_BASE = "https://firestore.googleapis.com/v1/projects/study-space-aeb52/databases/(default)/documents";
 
@@ -22,6 +23,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Try Admin SDK first (bypasses security rules)
+    if (adminDb) {
+      try {
+        await adminDb.collection("users").doc(uid).set(profile, { merge: true });
+        console.log("[save-profile] Saved via Admin SDK for", uid);
+        return NextResponse.json({ ok: true });
+      } catch (err) {
+        console.warn("[save-profile] Admin SDK failed, trying REST API");
+      }
+    }
+
+    // Fallback: Firestore REST API with ID token
     const res = await fetch(`${FIRESTORE_BASE}/users/${uid}`, {
       method: "PATCH",
       headers: {
@@ -37,6 +50,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Firestore write failed", status: res.status }, { status: 500 });
     }
 
+    console.log("[save-profile] Saved via REST API for", uid);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[save-profile] Failed:", err);

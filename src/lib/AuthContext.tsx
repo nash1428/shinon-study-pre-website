@@ -355,23 +355,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Update local state immediately
     setProfile(updatedProfile);
 
-    // Save to localStorage (per-user key)
+    // Save to localStorage (per-user key) — always works
     saveProfileToStorage(currentUser.uid, updatedProfile);
 
     // Update in-memory cache
     profileCacheRef.current.set(currentUser.uid, updatedProfile);
 
-    // Save to Firestore via server API
+    // Save to Firestore via server API — AWAIT it (was fire-and-forget before)
     try {
       const idToken = await currentUser.getIdToken();
       // GUARD: check again after await
       if (activeUidRef.current !== currentUser.uid) return;
-      saveProfileToServer(idToken, currentUser.uid, updatedProfile);
-    } catch {}
+      await saveProfileToServer(idToken, currentUser.uid, updatedProfile);
+      console.log("[AuthContext] Profile saved to server for", currentUser.uid);
+    } catch (err) {
+      console.error("[AuthContext] Server save failed, localStorage backup used:", err);
+    }
 
-    // Also try client SDK as backup
+    // Also try client SDK as backup (also await)
     if (db) {
-      setDoc(doc(db, "users", currentUser.uid), updatedProfile).catch(() => {});
+      try {
+        await setDoc(doc(db, "users", currentUser.uid), updatedProfile);
+        console.log("[AuthContext] Profile saved to Firestore client SDK for", currentUser.uid);
+      } catch (err) {
+        console.error("[AuthContext] Client SDK save failed:", err);
+      }
     }
   }, []);
 
