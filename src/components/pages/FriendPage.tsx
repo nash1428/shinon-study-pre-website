@@ -180,8 +180,42 @@ export default function FriendPage() {
     setFriendListLoading(false);
   };
 
+  // Fetch incoming friend requests (polls every 10 seconds)
+  const fetchIncomingRequests = async () => {
+    if (!user) return;
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/friend-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "list",
+          currentUserId: user.uid,
+          idToken,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.requests) {
+        setIncomingRequests(data.requests.map((req: { senderId: string; senderName: string; senderEmail: string; senderUniversity: string; senderAvatarUrl: string | null; senderIsPrivate: boolean }) => ({
+          id: req.senderId,
+          name: req.senderName,
+          email: req.senderEmail,
+          university: req.senderUniversity,
+          avatarUrl: req.senderAvatarUrl,
+          isPrivate: req.senderIsPrivate,
+        })));
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     fetchFriendList();
+    fetchIncomingRequests();
+    // Poll for new requests every 10 seconds
+    const interval = setInterval(() => {
+      fetchIncomingRequests();
+    }, 10000);
+    return () => clearInterval(interval);
   }, [user]);
 
   // Fetch friend's data when viewing their profile
@@ -249,11 +283,34 @@ export default function FriendPage() {
     setActionLoading(targetUserId);
     try {
       const idToken = await user.getIdToken();
-      await fetch("/api/user-connections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, currentUserId: user.uid, targetUserId, idToken }),
-      });
+
+      // Route friend request actions through the new friend-requests API
+      if (action === "send_request") {
+        await fetch("/api/friend-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "send", currentUserId: user.uid, targetUserId, idToken }),
+        });
+      } else if (action === "accept_request") {
+        await fetch("/api/friend-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "accept", currentUserId: user.uid, targetUserId, idToken }),
+        });
+      } else if (action === "reject_request") {
+        await fetch("/api/friend-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "decline", currentUserId: user.uid, targetUserId, idToken }),
+        });
+      } else {
+        // Follow/unfollow/unconnect still use user-connections
+        await fetch("/api/user-connections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, currentUserId: user.uid, targetUserId, idToken }),
+        });
+      }
 
       // Update search results
       setSearchResults((prev) =>
