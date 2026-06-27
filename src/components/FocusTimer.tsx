@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Minus, Plus, Award,
 } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { LoFiMusic } from "@/lib/lofi-music";
 
 const DEFAULT_DURATION = 25; // minutes
 const BREAK_DURATION = 5 * 60; // 5 minutes (fixed)
@@ -48,6 +49,22 @@ export default function FocusTimer() {
   const [kitsuneMessage, setKitsuneMessage] = useState("");
   const [showMessage, setShowMessage] = useState(false);
   const [ambientOn, setAmbientOn] = useState(false);
+  const lofiRef = useRef<LoFiMusic | null>(null);
+
+  // Start/stop lo-fi music when ambient is toggled
+  useEffect(() => {
+    if (ambientOn) {
+      if (!lofiRef.current) lofiRef.current = new LoFiMusic();
+      lofiRef.current.start();
+    } else {
+      lofiRef.current?.stop();
+    }
+  }, [ambientOn]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => { lofiRef.current?.stop(); };
+  }, []);
 
   const focusDuration = customMinutes * 60;
 
@@ -259,7 +276,7 @@ export default function FocusTimer() {
       {ambientOn && (
         <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-ink-muted">
           <Volume2 className="h-3 w-3" />
-          Ambient garden soundscape
+          Japan-inspired lo-fi soundscape
           <span className="text-gold">· active</span>
         </div>
       )}
