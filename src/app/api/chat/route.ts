@@ -48,52 +48,52 @@ const tools: OpenAI.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "createTask",
-      description: "Create a new task in the user's Task Tracker. Only call this when the user explicitly asks to create/add a task AND has provided a clear title. If the user hasn't specified a title, do NOT call this function — ask the user instead.",
+      name: "create_note",
+      description: "Create a new note in the user's Notes section. ONLY call this function when the user has provided BOTH a title AND a category. If the title or category is missing, DO NOT call this function — ask the user for the missing information first.",
       parameters: {
         type: "object",
         properties: {
           title: {
             type: "string",
-            description: "The title of the task. Must be explicitly stated or clearly derived from the user's request. Never guess or make up a title.",
-          },
-          dueDate: {
-            type: "string",
-            description: "Optional due date in ISO format (YYYY-MM-DD). Only include if the user specified a deadline.",
-          },
-        },
-        required: ["title"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "createNote",
-      description: "Create a new note in the user's Notes section. Only call this when the user explicitly asks to create/make a note AND has provided BOTH a title AND a category. If either the title or category is missing, do NOT call this function — ask the user for the missing information first.",
-      parameters: {
-        type: "object",
-        properties: {
-          title: {
-            type: "string",
-            description: "The title of the note. Must be explicitly stated by the user. Never guess or make up a title.",
+            description: "The title of the note. Must be explicitly provided by the user. NEVER guess or make up a title.",
           },
           category: {
             type: "string",
-            description: "The category for the note (e.g., 'Finance', 'Mathematics', 'General'). Must be explicitly stated by the user. Never guess or make up a category.",
+            description: "The category for the note (e.g., 'Work', 'Finance', 'Biology'). Must be explicitly provided by the user. NEVER guess or make up a category.",
           },
           content: {
             type: "string",
-            description: "The content/body of the note. Use the content the user provided, or leave empty if none specified.",
+            description: "Optional content/body for the note. Only include if the user provided content.",
           },
         },
         required: ["title", "category"],
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "create_task",
+      description: "Create a new task in the user's Task Tracker. ONLY call this function when the user has provided BOTH a title AND a due date. If the title or due date is missing, DO NOT call this function — ask the user for the missing information first.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "The title of the task. Must be explicitly provided by the user. NEVER guess or make up a title.",
+          },
+          dueDate: {
+            type: "string",
+            description: "The due date for the task in YYYY-MM-DD format. Must be explicitly provided by the user. NEVER guess or make up a date.",
+          },
+        },
+        required: ["title", "dueDate"],
+      },
+    },
+  },
 ];
 
-// ====== Execute function calls ======
+// ====== Execute function calls (server-side) ======
 function executeCreateTask(args: { title: string; dueDate?: string }) {
   const task = {
     id: Date.now(),
@@ -165,11 +165,29 @@ CRITICAL RULES — ANTI-HALLUCINATION:
 - When referencing data, use the EXACT names and details from the context.
 - If asked about something not in the data, clearly state it's not found.
 
-FUNCTION CALLING RULES — Creating Notes and Tasks:
-- When a user asks to create/add a task: Call the "createTask" function ONLY if they provided a clear title. If no title is given, ask them what the task should be.
-- When a user asks to create/make a note: Call the "createNote" function ONLY if they provided BOTH a title AND a category. If either is missing, ask the user for the missing information BEFORE calling the function.
-- NEVER guess or auto-fill missing titles or categories. Always ask the user.
-- After successfully creating a note or task, confirm it was created and mention the exact title/category used.
+CONVERSATIONAL DATA GATHERING — Creating Notes and Tasks:
+When a user wants to create a note or task, you MUST gather ALL required fields BEFORE calling any function. Do NOT call the function until the user has provided every required parameter.
+
+For NOTES — you need BOTH:
+1. Title — ask "What is the title of the note?" if not provided
+2. Category — ask "What category should this note be under?" if not provided
+
+For TASKS — you need BOTH:
+1. Title — ask "What is the task title?" if not provided
+2. Due Date — ask "What is the due date? (e.g., 2026-07-15)" if not provided
+
+FLOW EXAMPLE:
+User: "Create a note for me."
+You: "Sure! What is the title of the note?"
+User: "Meeting agenda."
+You: "Got it. What category should this note be under?"
+User: "Work."
+You: *calls create_note with title="Meeting agenda", category="Work"*
+You: "✅ Note 'Meeting agenda' has been created in the 'Work' category!"
+
+IMPORTANT: Do NOT call the function until the user has provided ALL required parameters. If a parameter is missing, ask the user for it. NEVER guess or auto-fill missing values.
+
+After successfully creating a note or task, confirm it was created and mention the exact title and category/due date used.
 
 FORMATTING RULES:
 - Use Markdown for ALL responses. Bold key terms with **text**, italics with *text*.
@@ -190,7 +208,7 @@ ${contextString}`;
 
     // First call — check if the AI wants to call a function
     const completion = await client.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+      model: "zai-org/glm-5.2",
       messages: apiMessages,
       tools,
       tool_choice: "auto",
@@ -208,15 +226,15 @@ ${contextString}`;
 
       let toolResult: { success: boolean; task?: unknown; note?: unknown };
 
-      if (functionName === "createTask") {
+      if (functionName === "create_task") {
         toolResult = executeCreateTask(functionArgs);
-      } else if (functionName === "createNote") {
+      } else if (functionName === "create_note") {
         toolResult = executeCreateNote(functionArgs);
       } else {
         return NextResponse.json({ ok: true, reply: "I'm not sure how to do that yet." });
       }
 
-      // Second call — let the AI generate a natural response confirming the action
+      // Second call — let the AI generate a natural confirmation response
       const followUpMessages: OpenAI.ChatCompletionMessageParam[] = [
         ...apiMessages,
         responseMessage,
@@ -228,7 +246,7 @@ ${contextString}`;
       ];
 
       const followUpCompletion = await client.chat.completions.create({
-      model: "zai-org/glm-5.2",
+        model: "zai-org/glm-5.2",
         messages: followUpMessages,
         max_tokens: 400,
       });
@@ -243,7 +261,7 @@ ${contextString}`;
       });
     }
 
-    // No function call — just return the text reply
+    // No function call — just return the text reply (e.g., asking for missing info)
     const reply = responseMessage?.content || "I'm here for you. What would you like to explore?";
 
     return NextResponse.json({ ok: true, reply });
