@@ -1,45 +1,46 @@
 "use client";
 
 /**
- * LoFi Ambient Music Generator — Japan-inspired
- * Uses Web Audio API to generate a self-contained lo-fi soundscape.
+ * LoFi Ambient Music Generator — Japan-inspired, true lo-fi aesthetic
  * 
  * Features:
- * - Japanese hirajoshi pentatonic scale
- * - Soft sine wave synth tones with low-pass filter
- * - Slow, random melody with reverb-like delay
- * - Subtle bass notes
- * - Gentle hi-hat pattern
+ * - Vinyl crackle (constant warm noise floor)
+ * - Kick + snare + hi-hat drum pattern at ~72 BPM
+ * - Jazz chord stabs (minor 7th chords) in Japanese pentatonic
+ * - Tape warble (slight pitch fluctuation)
+ * - Heavy low-pass filtering for warmth
+ * - Bass line following the chord progression
  */
 
-const HIRAJOSHI_SCALE = [
-  261.63, // C4
-  277.18, // C#4 (hirajoshi characteristic semitone)
-  349.23, // F4
-  392.00, // G4
-  415.30, // G#4
-  523.25, // C5
-  554.37, // C#5
-  698.46, // F5
+// Japanese hirajoshi scale — C, C#, F, G, G#
+// Chord progressions (root, third, fifth, seventh) — minor 7th voicings
+const CHORDS = [
+  { root: 65.41,  notes: [65.41, 77.78, 98.00, 116.54] }, // C2, D#3/F-, G2, A#2 — Cm7 voicing
+  { root: 73.42,  notes: [73.42, 87.31, 110.00, 130.81] }, // D2, F2, A2, C3 — Dm7
+  { root: 87.31,  notes: [87.31, 103.83, 130.81, 155.56] }, // F2, G#2, C3, D#3 — Fm7
+  { root: 98.00,  notes: [98.00, 116.54, 146.83, 174.61] }, // G2, A#2, D3, F3 — Gm7
 ];
 
-const BASS_NOTES = [
-  65.41,  // C2
-  73.42,  // D2
-  87.31,  // F2
-  98.00,  // G2
-];
+const BPM = 72;
+const BEAT_MS = 60000 / BPM; // ms per beat
+const BAR_MS = BEAT_MS * 4; // ms per bar (4/4)
 
 export class LoFiMusic {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private drumGain: GainNode | null = null;
+  private vinylGain: GainNode | null = null;
   private filter: BiquadFilterNode | null = null;
   private delay: DelayNode | null = null;
   private delayGain: GainNode | null = null;
   private isPlaying = false;
-  private melodyTimer: ReturnType<typeof setTimeout> | null = null;
-  private bassTimer: ReturnType<typeof setTimeout> | null = null;
-  private hatTimer: ReturnType<typeof setTimeout> | null = null;
+  private barCount = 0;
+  private currentChord = 0;
+  private barTimer: ReturnType<typeof setTimeout> | null = null;
+  private beatTimer: ReturnType<typeof setTimeout> | null = null;
+  private vinylTimer: ReturnType<typeof setTimeout> | null = null;
+  private warbleTimer: ReturnType<typeof setInterval> | null = null;
 
   start() {
     if (this.isPlaying) return;
@@ -49,31 +50,48 @@ export class LoFiMusic {
       this.ctx = new AudioContext();
       const ctx = this.ctx;
 
-      // Master gain (low volume for ambient)
+      // Master gain
       this.masterGain = ctx.createGain();
-      this.masterGain.gain.value = 0.15;
+      this.masterGain.gain.value = 0.25;
       this.masterGain.connect(ctx.destination);
 
-      // Low-pass filter for warmth
+      // Music chain: filter → delay → musicGain → masterGain
       this.filter = ctx.createBiquadFilter();
       this.filter.type = "lowpass";
-      this.filter.frequency.value = 1200;
-      this.filter.Q.value = 0.5;
-      this.filter.connect(this.masterGain);
+      this.filter.frequency.value = 800; // heavy low-pass for lo-fi warmth
+      this.filter.Q.value = 0.3;
 
-      // Delay for reverb-like effect
-      this.delay = ctx.createDelay(1.0);
-      this.delay.delayTime.value = 0.35;
+      // Delay (short echo for space)
+      this.delay = ctx.createDelay(0.5);
+      this.delay.delayTime.value = 0.28;
       this.delayGain = ctx.createGain();
-      this.delayGain.gain.value = 0.25;
+      this.delayGain.gain.value = 0.15;
       this.delay.connect(this.delayGain);
-      this.delayGain.connect(this.filter); // feedback
-      this.delayGain.connect(this.delay);
+      this.delayGain.connect(this.filter);
       this.filter.connect(this.delay);
 
-      this.scheduleMelody();
-      this.scheduleBass();
-      this.scheduleHat();
+      this.musicGain = ctx.createGain();
+      this.musicGain.gain.value = 0.5;
+      this.musicGain.connect(this.filter);
+      this.filter.connect(this.masterGain);
+
+      // Drum gain (separate, less filtered)
+      this.drumGain = ctx.createGain();
+      this.drumGain.gain.value = 0.4;
+      this.drumGain.connect(this.masterGain);
+
+      // Vinyl crackle gain
+      this.vinylGain = ctx.createGain();
+      this.vinylGain.gain.value = 0.08;
+      this.vinylGain.connect(this.masterGain);
+
+      this.currentChord = 0;
+      this.barCount = 0;
+
+      // Start the rhythm
+      this.scheduleBar();
+      this.scheduleVinylCrackle();
+      this.startWarble();
     } catch (err) {
       console.error("[LoFiMusic] Failed to start:", err);
     }
@@ -81,17 +99,16 @@ export class LoFiMusic {
 
   stop() {
     this.isPlaying = false;
-    if (this.melodyTimer) clearTimeout(this.melodyTimer);
-    if (this.bassTimer) clearTimeout(this.bassTimer);
-    if (this.hatTimer) clearTimeout(this.hatTimer);
-    
+    if (this.barTimer) clearTimeout(this.barTimer);
+    if (this.beatTimer) clearTimeout(this.beatTimer);
+    if (this.vinylTimer) clearTimeout(this.vinylTimer);
+    if (this.warbleTimer) clearInterval(this.warbleTimer);
+
     if (this.masterGain && this.ctx) {
-      // Fade out
       const now = this.ctx.currentTime;
       this.masterGain.gain.cancelScheduledValues(now);
       this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
       this.masterGain.gain.linearRampToValueAtTime(0, now + 0.5);
-      
       setTimeout(() => {
         this.ctx?.close().catch(() => {});
         this.ctx = null;
@@ -103,91 +120,236 @@ export class LoFiMusic {
     return this.isPlaying;
   }
 
-  private scheduleMelody() {
-    if (!this.isPlaying || !this.ctx || !this.filter) return;
-
-    // Pick a random note from the hirajoshi scale
-    const freq = HIRAJOSHI_SCALE[Math.floor(Math.random() * HIRAJOSHI_SCALE.length)];
-    const now = this.ctx.currentTime;
-
-    // Create oscillator (soft sine)
-    const osc = this.ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = freq;
-
-    // Gain envelope (soft attack, slow release)
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.12, now + 0.3); // soft attack
-    gain.gain.linearRampToValueAtTime(0.08, now + 1.5);  // sustain
-    gain.gain.linearRampToValueAtTime(0, now + 3.0);     // release
-
-    osc.connect(gain);
-    gain.connect(this.filter);
-    osc.start(now);
-    osc.stop(now + 3.2);
-
-    // Schedule next note (random delay 2-5 seconds for slow, sparse melody)
-    const nextDelay = 2000 + Math.random() * 3000;
-    this.melodyTimer = setTimeout(() => this.scheduleMelody(), nextDelay);
+  // ====== Tape warble (subtle pitch fluctuation) ======
+  private startWarble() {
+    if (!this.filter || !this.ctx) return;
+    this.warbleTimer = setInterval(() => {
+      if (!this.filter || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      // Slight filter frequency wobble (simulates tape speed variation)
+      const baseFreq = 800;
+      const wobble = Math.sin(now * 0.5) * 50 + (Math.random() - 0.5) * 30;
+      this.filter.frequency.setTargetAtTime(baseFreq + wobble, now, 0.1);
+    }, 100);
   }
 
-  private scheduleBass() {
-    if (!this.isPlaying || !this.ctx || !this.filter) return;
+  // ====== Drum pattern (kick on 1&3, snare on 2&4, hat on offbeats) ======
+  private scheduleBar() {
+    if (!this.isPlaying || !this.ctx) return;
 
-    const freq = BASS_NOTES[Math.floor(Math.random() * BASS_NOTES.length)];
-    const now = this.ctx.currentTime;
+    const chord = CHORDS[this.currentChord];
+
+    // Beat 1: Kick + chord stab
+    this.scheduleKick(0);
+    this.scheduleChordStab(chord, 0);
+
+    // Beat 2: Snare + hi-hat
+    this.scheduleSnare(BEAT_MS);
+    this.scheduleHat(BEAT_MS * 0.5);
+
+    // Beat 3: Kick + chord stab (higher octave)
+    this.scheduleKick(BEAT_MS * 2);
+    this.scheduleChordStab(chord, BEAT_MS * 2, 2);
+
+    // Beat 4: Snare + hi-hat
+    this.scheduleSnare(BEAT_MS * 3);
+    this.scheduleHat(BEAT_MS * 2.5);
+    this.scheduleHat(BEAT_MS * 3.5);
+
+    // Bass note on beat 1 (long, sustained)
+    this.scheduleBass(chord.root, 0);
+
+    // Advance chord every 2 bars
+    this.barCount++;
+    if (this.barCount % 2 === 0) {
+      this.currentChord = (this.currentChord + 1) % CHORDS.length;
+    }
+
+    // Schedule next bar
+    this.barTimer = setTimeout(() => this.scheduleBar(), BAR_MS);
+  }
+
+  // ====== Kick drum ======
+  private scheduleKick(offsetMs: number) {
+    if (!this.ctx || !this.drumGain) return;
+    const time = this.ctx.currentTime + offsetMs / 1000;
+
+    const osc = this.ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(120, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time + 0.1);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.5, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+
+    osc.connect(gain);
+    gain.connect(this.drumGain);
+    osc.start(time);
+    osc.stop(time + 0.35);
+  }
+
+  // ====== Snare (noise + tone) ======
+  private scheduleSnare(offsetMs: number) {
+    if (!this.ctx || !this.drumGain) return;
+    const time = this.ctx.currentTime + offsetMs / 1000;
+
+    // Noise component
+    const bufferSize = this.ctx.sampleRate * 0.15;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1);
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const noiseFilter = this.ctx.createBiquadFilter();
+    noiseFilter.type = "highpass";
+    noiseFilter.frequency.value = 1000;
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.15, time);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.drumGain);
+    noise.start(time);
+
+    // Tone component (snare body)
+    const osc = this.ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = 180;
+
+    const toneGain = this.ctx.createGain();
+    toneGain.gain.setValueAtTime(0.08, time);
+    toneGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+
+    osc.connect(toneGain);
+    toneGain.connect(this.drumGain);
+    osc.start(time);
+    osc.stop(time + 0.1);
+  }
+
+  // ====== Hi-hat ======
+  private scheduleHat(offsetMs: number) {
+    if (!this.ctx || !this.drumGain) return;
+    const time = this.ctx.currentTime + offsetMs / 1000;
+
+    const bufferSize = this.ctx.sampleRate * 0.04;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.5;
+    }
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 7000;
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.03, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.drumGain);
+    noise.start(time);
+  }
+
+  // ====== Chord stab (jazz chord — multiple oscillators) ======
+  private scheduleChordStab(chord: { notes: number[] }, offsetMs: number, octaveShift: number = 1) {
+    if (!this.ctx || !this.musicGain) return;
+    const ctx = this.ctx;
+    const musicGain = this.musicGain;
+    const time = ctx.currentTime + offsetMs / 1000;
+
+    chord.notes.forEach((freq, i) => {
+      const adjustedFreq = freq * (octaveShift === 2 ? 2 : 1);
+
+      const osc = ctx.createOscillator();
+      osc.type = i === 0 ? "sine" : "triangle";
+      osc.frequency.value = adjustedFreq;
+
+      // Slight detune for warmth
+      osc.detune.value = (Math.random() - 0.5) * 8;
+
+      const gain = ctx.createGain();
+      const vol = i === 0 ? 0.12 : 0.05;
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(vol, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 1.0);
+
+      osc.connect(gain);
+      gain.connect(musicGain);
+      osc.start(time);
+      osc.stop(time + 1.1);
+    });
+  }
+
+  // ====== Bass note (sustained) ======
+  private scheduleBass(freq: number, offsetMs: number) {
+    if (!this.ctx || !this.musicGain) return;
+    const time = this.ctx.currentTime + offsetMs / 1000;
 
     const osc = this.ctx.createOscillator();
     osc.type = "triangle";
     osc.frequency.value = freq;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.08, now + 0.2);
-    gain.gain.linearRampToValueAtTime(0, now + 4.0);
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(0.15, time + 0.05);
+    gain.gain.linearRampToValueAtTime(0.08, time + 0.5);
+    gain.gain.linearRampToValueAtTime(0, time + 3.5);
 
     osc.connect(gain);
-    gain.connect(this.filter);
-    osc.start(now);
-    osc.stop(now + 4.2);
-
-    // Next bass note every 4-6 seconds
-    const nextDelay = 4000 + Math.random() * 2000;
-    this.bassTimer = setTimeout(() => this.scheduleBass(), nextDelay);
+    gain.connect(this.musicGain);
+    osc.start(time);
+    osc.stop(time + 3.6);
   }
 
-  private scheduleHat() {
-    if (!this.isPlaying || !this.ctx || !this.masterGain) return;
+  // ====== Vinyl crackle (continuous warm noise) ======
+  private scheduleVinylCrackle() {
+    if (!this.isPlaying || !this.ctx || !this.vinylGain) return;
 
     const now = this.ctx.currentTime;
-
-    // Create a very subtle hi-hat sound using white noise
-    const bufferSize = this.ctx.sampleRate * 0.05; // 50ms
+    const duration = 2.0; // generate 2 seconds at a time
+    const bufferSize = this.ctx.sampleRate * duration;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
+
+    // Generate vinyl crackle: mostly silence with random pops
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.3;
+      const baseNoise = (Math.random() - 0.5) * 0.02; // very quiet hiss
+      // Random pops (crackle)
+      if (Math.random() < 0.0008) {
+        data[i] = (Math.random() - 0.5) * 0.6; // loud pop
+      } else if (Math.random() < 0.003) {
+        data[i] = (Math.random() - 0.5) * 0.2; // medium crackle
+      } else {
+        data[i] = baseNoise;
+      }
     }
 
     const noise = this.ctx.createBufferSource();
     noise.buffer = buffer;
 
-    const hatFilter = this.ctx.createBiquadFilter();
-    hatFilter.type = "highpass";
-    hatFilter.frequency.value = 6000;
+    // Bandpass filter for vinyl character
+    const crackleFilter = this.ctx.createBiquadFilter();
+    crackleFilter.type = "bandpass";
+    crackleFilter.frequency.value = 2500;
+    crackleFilter.Q.value = 0.5;
 
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.02, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
-    noise.connect(hatFilter);
-    hatFilter.connect(gain);
-    gain.connect(this.masterGain);
+    noise.connect(crackleFilter);
+    crackleFilter.connect(this.vinylGain);
     noise.start(now);
 
-    // Next hat every 0.5-1.5 seconds (slow, lo-fi feel)
-    const nextDelay = 500 + Math.random() * 1000;
-    this.hatTimer = setTimeout(() => this.scheduleHat(), nextDelay);
+    // Schedule next crackle buffer
+    this.vinylTimer = setTimeout(() => this.scheduleVinylCrackle(), duration * 1000 - 100);
   }
 }
