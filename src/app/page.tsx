@@ -14,11 +14,55 @@ import TasksPage from "@/components/pages/TasksPage";
 import SearchPage from "@/components/pages/SearchPage";
 import FriendPage from "@/components/pages/FriendPage";
 
+// Map URL hash to tab ID and vice versa
+const hashToTab: Record<string, TabId> = {
+  "#home": "home",
+  "#notes": "notes",
+  "#tasks": "tasks",
+  "#friend": "friend",
+  "#search": "search",
+};
+const tabToHash: Record<TabId, string> = {
+  home: "#home",
+  notes: "#notes",
+  tasks: "#tasks",
+  friend: "#friend",
+  search: "#search",
+};
+
+// Get initial tab from URL hash (survives refresh)
+function getTabFromHash(): TabId {
+  if (typeof window === "undefined") return "home";
+  const hash = window.location.hash.toLowerCase();
+  return hashToTab[hash] || "home";
+}
+
 function ProtectedApp() {
   const { user, loading, profile } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabId>("home");
+  // Initialize from URL hash so refresh keeps the current page
+  const [activeTab, setActiveTab] = useState<TabId>(getTabFromHash);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Sync activeTab changes to URL hash
+  const handleTabChange = (tab: TabId) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      window.location.hash = tabToHash[tab];
+    }
+  };
+
+  // Listen for hash changes (e.g., browser back/forward buttons)
+  useEffect(() => {
+    const handler = () => {
+      const newTab = getTabFromHash();
+      if (newTab !== activeTab) {
+        setActiveTab(newTab);
+      }
+    };
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -26,10 +70,15 @@ function ProtectedApp() {
     }
   }, [loading, user, router]);
 
+  // Show loading spinner while Firebase auth is initializing
+  // This prevents the redirect to home on refresh
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-ivory">
-        <Loader2 className="h-6 w-6 animate-spin text-moss" />
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-moss" />
+          <p className="text-xs text-ink-muted">Loading your garden...</p>
+        </div>
       </div>
     );
   }
@@ -61,7 +110,7 @@ function ProtectedApp() {
     <div className="min-h-screen bg-ivory">
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         profileData={profile}

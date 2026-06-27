@@ -94,12 +94,12 @@ export default function FriendPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Incoming friend requests
-  const [incomingRequests, setIncomingRequests] = useState<IncomingRequestUser[]>([]);
+  // Incoming friend requests — cached in localStorage for refresh persistence
+  const [incomingRequests, setIncomingRequests] = useLocalStorage<IncomingRequestUser[]>("studyspace_friend_requests", []);
   const [showRequests, setShowRequests] = useState(false);
 
-  // Friend list (from Firestore)
-  const [friendList, setFriendList] = useState<FriendListUser[]>([]);
+  // Friend list — cached in localStorage for refresh persistence
+  const [friendList, setFriendList] = useLocalStorage<FriendListUser[]>("studyspace_friend_list", []);
   const [friendListLoading, setFriendListLoading] = useState(true);
 
   // Selected friend profile view
@@ -146,7 +146,7 @@ export default function FriendPage() {
     });
   }, [user, profile, showTodayTasks, showTodaySchedule]);
 
-  // Fetch friend list from Firestore
+  // Fetch friend list from Firestore (merges with cached localStorage data)
   const fetchFriendList = async () => {
     if (!user) return;
     setFriendListLoading(true);
@@ -163,14 +163,21 @@ export default function FriendPage() {
       });
       const data = await res.json();
       if (data.ok) {
-        // Filter to only show friends and people we follow
         const friendsAndFollowing = data.users.filter((u: SearchResultUser) => u.isFriend || u.isFollowing);
-        setFriendList(friendsAndFollowing.map((u: SearchResultUser) => ({
+        const newList = friendsAndFollowing.map((u: SearchResultUser) => ({
           id: u.id, name: u.name, email: u.email, university: u.university,
           avatarUrl: u.avatarUrl, isPrivate: u.isPrivate,
           showTodayTasks: true, showTodaySchedule: true,
           isFriend: u.isFriend, isFollowing: u.isFollowing,
-        })));
+        }));
+        // Merge: keep cached entries that aren't in the new list (in-memory registry updates)
+        const mergedList = [...newList];
+        friendList.forEach((cached) => {
+          if (!mergedList.find((f) => f.id === cached.id)) {
+            mergedList.push(cached);
+          }
+        });
+        setFriendList(mergedList);
         // Save incoming requests
         if (data.incomingRequests) {
           setIncomingRequests(data.incomingRequests);
@@ -217,6 +224,9 @@ export default function FriendPage() {
     }, 10000);
     return () => clearInterval(interval);
   }, [user]);
+
+  // If we have cached friend list, show it immediately (not loading)
+  const showLoading = friendListLoading && friendList.length === 0;
 
   // Fetch friend's data when viewing their profile
   const fetchFriendData = async (friend: FriendListUser) => {
@@ -791,7 +801,7 @@ export default function FriendPage() {
       {/* Friends list — populated from Firestore */}
       <div>
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Friends</h2>
-        {friendListLoading ? (
+        {showLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-ink-muted" />
           </div>
