@@ -20,7 +20,7 @@ interface FriendEvent {
 }
 
 async function fetchUserFromFirestore(idToken: string, uid: string): Promise<RegisteredUser | null> {
-  // Try Admin SDK first (bypasses security rules)
+  // Try Admin SDK first
   if (adminDb) {
     try {
       const docSnap = await adminDb.collection("users").doc(uid).get();
@@ -62,7 +62,7 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
       if (res.ok) {
         const data = await res.json();
         const fields = data.fields || {};
-        // Inline parse to avoid dynamic import issues
+        // Inline parse
         const getString = (key: string): string => {
           const v = fields[key] as { stringValue?: string } | undefined;
           return v?.stringValue || "";
@@ -106,6 +106,100 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
   return userRegistry.get(uid) || null;
 }
 
+/**
+ * Fetch today's tasks for a user from Firestore + in-memory registry.
+ * Today's date is calculated dynamically as YYYY-MM-DD.
+ */
+async function fetchTodayTasks(targetUserId: string): Promise<FriendTask[]> {
+  const tasks: FriendTask[] = [];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayDateStr = today.toDateString();
+
+  // 1. Try Firestore via Admin SDK
+  if (adminDb) {
+    try {
+      const snapshot = await adminDb.collection("tasks")
+        .where("userId", "==", targetUserId)
+        .limit(50)
+        .get();
+      snapshot.forEach((d) => {
+        const data = d.data();
+        const deadline = data.deadline || data.dueDate || "";
+        // Match if deadline is today OR if no deadline (today's task)
+        let isToday = true;
+        if (deadline) {
+          try {
+            isToday = new Date(deadline).toDateString() === todayDateStr;
+          } catch {
+            isToday = deadline === todayStr;
+          }
+        }
+        if (isToday) {
+          tasks.push({
+            id: d.id,
+            title: data.title || "",
+            done: data.done || false,
+            deadline,
+            content: data.content || "",
+          });
+        }
+      });
+    } catch (err) {
+      console.warn("[friend-data] Tasks fetch from Firestore failed:", err);
+    }
+  }
+
+  // 2. Also check the in-memory registry for this user's tasks
+  // (tasks created via chat or notes are saved to localStorage, but if the user
+  // visited the Friend page, their task data might be in the registry)
+  // Note: This won't have the actual tasks — they're in localStorage on the client.
+  // The real solution is to save tasks to Firestore when created.
+  // For now, return whatever Firestore has.
+
+  return tasks;
+}
+
+/**
+ * Fetch today's schedule/events for a user from Firestore.
+ * Today's date is calculated dynamically as YYYY-MM-DD.
+ */
+async function fetchTodayEvents(targetUserId: string): Promise<FriendEvent[]> {
+  const events: FriendEvent[] = [];
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // Try Firestore via Admin SDK
+  if (adminDb) {
+    try {
+      const snapshot = await adminDb.collection("events")
+        .where("userId", "==", targetUserId)
+        .limit(50)
+        .get();
+      snapshot.forEach((d) => {
+        const data = d.data();
+        const eventDate = data.date || "";
+        // Match if event date matches today's date string
+        // Event dates are stored as YYYY-MM-DD (from the calendar)
+        if (eventDate === todayStr || eventDate.includes(todayStr)) {
+          events.push({
+            id: d.id,
+            title: data.title || "",
+            date: eventDate,
+            startTime: data.startTime || "",
+            endTime: data.endTime || "",
+            location: data.location || "",
+          });
+        }
+      });
+    } catch (err) {
+      console.warn("[friend-data] Events fetch from Firestore failed:", err);
+    }
+  }
+
+  return events;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { targetUserId, currentUserId, idToken } = await req.json();
@@ -140,71 +234,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Privacy settings
+    // Privacy settings — respect the user's toggles
     const showTasks = targetUser.showTodayTasks;
     const showSchedule = targetUser.showTodaySchedule;
 
-    let tasks: FriendTask[] = [];
-    let events: FriendEvent[] = [];
+    // Fetch today's tasks and events in parallel
+    const [tasks, events] = await Promise.all([
+      showTasks ? fetchTodayTasks(targetUserId) : Promise.resolve([]),
+      showSchedule ? fetchTodayEvents(targetUserId) : Promise.resolve([]),
+    ]);
 
-    // Fetch today's tasks from Firestore
-    if (showTasks && adminDb) {
-      try {
-        const tasksSnapshot = await adminDb.collection("tasks")
-          .where("userId", "==", targetUserId)
-          .limit(20)
-          .get();
-        const today = new Date().toDateString();
-        tasks = tasksSnapshot.docs
-          .map((d) => {
-            const data = d.data();
-            return {
-              id: d.id,
-              title: data.title || "",
-              done: data.done || false,
-              deadline: data.deadline || data.dueDate || "",
-              content: data.content || "",
-            } as FriendTask;
-          })
-          .filter((t) => {
-            if (!t.deadline) return true;
-            try {
-              return new Date(t.deadline).toDateString() === today;
-            } catch {
-              return true;
-            }
-          });
-      } catch (err) {
-        console.warn("[friend-data] Tasks fetch failed:", err);
-      }
-    }
-
-    // Fetch today's events from Firestore
-    if (showSchedule && adminDb) {
-      try {
-        const eventsSnapshot = await adminDb.collection("events")
-          .where("userId", "==", targetUserId)
-          .limit(20)
-          .get();
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-        events = eventsSnapshot.docs
-          .map((d) => {
-            const data = d.data();
-            return {
-              id: d.id,
-              title: data.title || "",
-              date: data.date || "",
-              startTime: data.startTime || "",
-              endTime: data.endTime || "",
-              location: data.location || "",
-            } as FriendEvent;
-          })
-          .filter((e) => e.date === todayStr);
-      } catch (err) {
-        console.warn("[friend-data] Events fetch failed:", err);
-      }
-    }
+    console.log(`[friend-data] Fetched for ${targetUserId}: ${tasks.length} tasks, ${events.length} events`);
 
     return NextResponse.json({
       ok: true,
@@ -220,6 +260,7 @@ export async function POST(req: NextRequest) {
       },
       isFriend,
       isFollowing,
+      todayDate: new Date().toISOString().split("T")[0], // YYYY-MM-DD
     });
   } catch (err) {
     console.error("[friend-data] Failed:", err);

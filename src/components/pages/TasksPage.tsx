@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, Plus, Trash2, X, Calendar, AlignLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { todayTasks, upcomingTasks, type TaskItem } from "@/lib/data";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useAuth } from "@/lib/AuthContext";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
 
 interface Task extends TaskItem {
   content?: string;
@@ -54,6 +57,7 @@ function dateKey(dateStr: string) {
 
 export default function TasksPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [allTasks, setAllTasks] = useLocalStorage<Task[]>("studyspace_tasks_all", [
     ...todayTasks.map((t) => ({ ...t, content: "", deadline: "" })),
     ...upcomingTasks.map((t) => ({ ...t, content: "", deadline: "" })),
@@ -84,7 +88,13 @@ export default function TasksPage() {
     .sort((a, b) => new Date(a.dateKey).getTime() - new Date(b.dateKey).getTime());
 
   const toggleTask = (id: number) => {
-    setAllTasks(allTasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    const updated = allTasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t));
+    setAllTasks(updated);
+    // Sync to Firestore
+    const task = updated.find((t) => t.id === id);
+    if (task && user && db) {
+      setDoc(doc(db, "tasks", String(task.id)), { ...task, userId: user.uid }, { merge: true }).catch(() => {});
+    }
   };
 
   const handleAddTask = () => {
@@ -97,6 +107,10 @@ export default function TasksPage() {
       deadline: newTaskDeadline || undefined,
     };
     setAllTasks([...allTasks, newTask]);
+    // Sync to Firestore
+    if (user && db) {
+      setDoc(doc(db, "tasks", String(newTask.id)), { ...newTask, userId: user.uid }).catch(() => {});
+    }
     setNewTaskTitle("");
     setNewTaskContent("");
     setNewTaskDeadline("");
@@ -106,10 +120,21 @@ export default function TasksPage() {
   const handleDeleteTask = (id: number) => {
     setAllTasks(allTasks.filter((t) => t.id !== id));
     if (expandedTaskId === id) setExpandedTaskId(null);
+    // Also delete from Firestore
+    if (db) {
+      deleteDoc(doc(db, "tasks", String(id))).catch(() => {});
+    }
   };
 
   const handleClearCompleted = () => {
+    const completed = allTasks.filter((t) => t.done);
     setAllTasks(allTasks.filter((t) => !t.done));
+    // Also delete completed tasks from Firestore
+    if (db) {
+      completed.forEach((task) => {
+        deleteDoc(doc(db, "tasks", String(task.id))).catch(() => {});
+      });
+    }
   };
 
   const TaskRow = ({ task, listLabel }: { task: Task; listLabel: string }) => (

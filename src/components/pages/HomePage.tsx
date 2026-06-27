@@ -9,6 +9,8 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/AuthContext";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, deleteDoc } from "firebase/firestore";
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const monthsEn = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -53,7 +55,7 @@ function toISODate(year: number, month: number, day: number) {
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const isJp = i18n.language === "jp";
   const hour = new Date().getHours();
   const greetingKey = hour < 12 ? "home.greeting.morning" : hour < 18 ? "home.greeting.afternoon" : "home.greeting.evening";
@@ -228,14 +230,20 @@ export default function HomePage() {
     if (!newEventTitle.trim()) return;
     if (editingEventId) {
       // Edit existing
-      setLocalEvents(localEvents.map((e) => e.id === editingEventId ? {
+      const updated = localEvents.map((e) => e.id === editingEventId ? {
         ...e,
         title: newEventTitle.trim(),
         date: newEventDate,
         startTime: newEventStart,
         endTime: newEventEnd,
         location: newEventLocation.trim(),
-      } : e));
+      } : e);
+      setLocalEvents(updated);
+      // Sync to Firestore
+      const evt = updated.find((e) => e.id === editingEventId);
+      if (evt && user && db) {
+        setDoc(doc(db, "events", evt.id), { ...evt, userId: user.uid }, { merge: true }).catch(() => {});
+      }
     } else {
       // Add new
       const newEvent: LocalEvent = {
@@ -248,6 +256,10 @@ export default function HomePage() {
         source: "local",
       };
       setLocalEvents([...localEvents, newEvent]);
+      // Sync to Firestore
+      if (user && db) {
+        setDoc(doc(db, "events", newEvent.id), { ...newEvent, userId: user.uid }).catch(() => {});
+      }
     }
     setNewEventTitle("");
     setNewEventLocation("");
@@ -257,6 +269,10 @@ export default function HomePage() {
 
   const handleDeleteLocalEvent = (id: string) => {
     setLocalEvents(localEvents.filter((e) => e.id !== id));
+    // Also delete from Firestore
+    if (db) {
+      deleteDoc(doc(db, "events", id)).catch(() => {});
+    }
   };
 
   const weekDays = useMemo(() => {
