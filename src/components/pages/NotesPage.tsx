@@ -585,8 +585,8 @@ export default function NotesPage() {
           {/* ====== VIEW MODE: Split-screen layout (1:2 ratio) ====== */}
           {noteViewMode === "view" ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* LEFT (1/3): Note Content (read-only, rendered) */}
-              <div className="lg:col-span-1 space-y-4">
+              {/* LEFT (2/3): Note Content (read-only, rendered) */}
+              <div className="lg:col-span-2 space-y-4">
                 {expandedNote.fullContent ? (
                   <div className="rounded-xl bg-white p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
                     <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Note Content</h3>
@@ -599,8 +599,8 @@ export default function NotesPage() {
                 )}
               </div>
 
-              {/* RIGHT (2/3): PDF/Materials + Anki Cards + Quiz */}
-              <div className="lg:col-span-2 space-y-6">
+              {/* RIGHT (1/3): PDF/Materials + Anki Cards + Quiz */}
+              <div className="lg:col-span-1 space-y-6">
                 {/* PDF / Materials — collapsible */}
                 {expandedNote.pdfData && (
                   <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
