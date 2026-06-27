@@ -3,15 +3,15 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Send, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { useAuth } from "@/lib/AuthContext";
+import { db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 interface Message {
   role: "user" | "bot";
   text: string;
 }
 
-/**
- * Fox Sensei chatbot icon — uses the custom image asset.
- */
 function FoxChatIcon({ size = 24 }: { size?: number }) {
   return (
     <img
@@ -26,6 +26,7 @@ function FoxChatIcon({ size = 24 }: { size?: number }) {
 }
 
 export default function FloatingChatbot() {
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -40,52 +41,69 @@ export default function FloatingChatbot() {
     }
   }, [messages]);
 
-  // Build context from localStorage so Fox Sensei can answer data questions
   const buildAppContext = () => {
     try {
       const context: Record<string, unknown> = {};
 
-      // Notes
       const notesRaw = localStorage.getItem("studyspace_notes");
       if (notesRaw) {
         const notes = JSON.parse(notesRaw);
         context.notes = notes.map((n: { title: string; tag: string; excerpt: string; date: string; fullContent?: string }) => ({
-          title: n.title,
-          tag: n.tag,
-          excerpt: n.excerpt,
-          date: n.date,
-          content: n.fullContent,
+          title: n.title, tag: n.tag, excerpt: n.excerpt, date: n.date, content: n.fullContent,
         }));
       }
 
-      // Tasks
       const tasksRaw = localStorage.getItem("studyspace_tasks_all");
       if (tasksRaw) {
         const tasks = JSON.parse(tasksRaw);
         context.tasks = tasks.map((t: { title: string; content?: string; deadline?: string; done: boolean }) => ({
-          title: t.title,
-          content: t.content,
-          deadline: t.deadline,
-          done: t.done,
+          title: t.title, content: t.content, deadline: t.deadline, done: t.done,
         }));
       }
 
-      // Events
       const eventsRaw = localStorage.getItem("studyspace_local_events");
       if (eventsRaw) {
         const events = JSON.parse(eventsRaw);
         context.events = events.map((e: { title: string; date: string; startTime: string; endTime: string; location: string }) => ({
-          title: e.title,
-          date: e.date,
-          startTime: e.startTime,
-          endTime: e.endTime,
-          location: e.location,
+          title: e.title, date: e.date, startTime: e.startTime, endTime: e.endTime, location: e.location,
         }));
       }
 
       return context;
     } catch {
       return {};
+    }
+  };
+
+  // Save task to Firestore (client-side, using user's auth)
+  const saveTaskClientSide = async (task: { id: number; title: string; done: boolean; content: string; deadline?: string }) => {
+    if (!user || !db) return false;
+    try {
+      await setDoc(doc(db, "tasks", String(task.id)), {
+        ...task, userId: user.uid, source: "chatbot",
+        createdAt: new Date().toISOString(),
+      });
+      console.log("[chatbot] Task saved to Firestore client-side:", task.id);
+      return true;
+    } catch (err) {
+      console.error("[chatbot] Failed to save task client-side:", err);
+      return false;
+    }
+  };
+
+  // Save note to Firestore (client-side, using user's auth)
+  const saveNoteClientSide = async (note: { id: number; title: string; category: string; tag: string; date: string; excerpt: string; fullContent: string; fullWidth: boolean }) => {
+    if (!user || !db) return false;
+    try {
+      await setDoc(doc(db, "notes", String(note.id)), {
+        ...note, userId: user.uid, source: "chatbot",
+        createdAt: new Date().toISOString(),
+      });
+      console.log("[chatbot] Note saved to Firestore client-side:", note.id);
+      return true;
+    } catch (err) {
+      console.error("[chatbot] Failed to save note client-side:", err);
+      return false;
     }
   };
 
@@ -104,11 +122,46 @@ export default function FloatingChatbot() {
         body: JSON.stringify({
           messages: [...messages, { role: "user", text: userMsg }],
           context,
+          userId: user?.uid || null,
         }),
       });
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: "bot", text: data.reply || "I'm here. Tell me more." }]);
-    } catch {
+
+      if (data.ok) {
+        setMessages((prev) => [...prev, { role: "bot", text: data.reply || "I'm here. Tell me more." }]);
+
+        // If the AI called a function, also save client-side as a backup
+        // (the API tries Admin SDK first, this is the fallback)
+        if (data.action && data.actionResult) {
+          console.log("[chatbot] AI action:", data.action, "result:", data.actionResult);
+
+          if (data.action === "create_task" && data.actionResult.task) {
+            const task = data.actionResult.task as { id: number; title: string; done: boolean; content: string; deadline?: string };
+            // Save to localStorage (so Tasks page picks it up)
+            try {
+              const existing = JSON.parse(localStorage.getItem("studyspace_tasks_all") || "[]");
+              localStorage.setItem("studyspace_tasks_all", JSON.stringify([...existing, task]));
+            } catch {}
+            // Also save to Firestore client-side
+            await saveTaskClientSide(task);
+          }
+
+          if (data.action === "create_note" && data.actionResult.note) {
+            const note = data.actionResult.note as { id: number; title: string; category: string; tag: string; date: string; excerpt: string; fullContent: string; fullWidth: boolean };
+            // Save to localStorage (so Notes page picks it up)
+            try {
+              const existing = JSON.parse(localStorage.getItem("studyspace_notes") || "[]");
+              localStorage.setItem("studyspace_notes", JSON.stringify([note, ...existing]));
+            } catch {}
+            // Also save to Firestore client-side
+            await saveNoteClientSide(note);
+          }
+        }
+      } else {
+        setMessages((prev) => [...prev, { role: "bot", text: data.error || "Something went wrong. Please try again." }]);
+      }
+    } catch (err) {
+      console.error("[chatbot] Request failed:", err);
       setMessages((prev) => [...prev, { role: "bot", text: "The garden is resting. Please try again in a moment." }]);
     } finally {
       setIsThinking(false);
@@ -117,10 +170,8 @@ export default function FloatingChatbot() {
 
   return (
     <>
-      {/* Chat panel — opens above the icon */}
       {isOpen && (
         <div className="fixed bottom-24 right-6 z-[60] flex h-[400px] w-[340px] max-w-[calc(100vw-3rem)] flex-col rounded-2xl bg-white shadow-[var(--shadow-float)] border border-ivory-deep/40 page-enter">
-          {/* Header with fox icon */}
           <div className="flex items-center justify-between border-b border-ivory-deep/40 px-4 py-3">
             <div className="flex items-center gap-2">
               <FoxChatIcon size={20} />
@@ -134,7 +185,6 @@ export default function FloatingChatbot() {
             </button>
           </div>
 
-          {/* Messages */}
           <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-4">
             {messages.map((msg, i) => (
               <div
@@ -194,7 +244,6 @@ export default function FloatingChatbot() {
             )}
           </div>
 
-          {/* Input */}
           <div className="border-t border-ivory-deep/40 p-3">
             <div className="flex gap-2">
               <input
@@ -217,7 +266,6 @@ export default function FloatingChatbot() {
         </div>
       )}
 
-      {/* Floating icon — fox face, always visible at bottom-right */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-[var(--shadow-float)] transition-transform hover:scale-105 active:scale-95 border border-ivory-deep/40"

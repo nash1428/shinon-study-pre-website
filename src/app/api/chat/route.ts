@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { adminDb } from "@/lib/firebase-admin";
+import { userRegistry, FIRESTORE_BASE } from "../register-user/route";
 
 interface ChatMessage {
   role: "user" | "bot";
@@ -55,15 +57,15 @@ const tools: OpenAI.ChatCompletionTool[] = [
         properties: {
           title: {
             type: "string",
-            description: "The title of the note. Must be explicitly provided by the user. NEVER guess or make up a title.",
+            description: "The title of the note. Must be explicitly provided by the user.",
           },
           category: {
             type: "string",
-            description: "The category for the note (e.g., 'Work', 'Finance', 'Biology'). Must be explicitly provided by the user. NEVER guess or make up a category.",
+            description: "The category for the note (e.g., 'Work', 'Finance', 'Biology'). Must be explicitly provided by the user.",
           },
           content: {
             type: "string",
-            description: "Optional content/body for the note. Only include if the user provided content.",
+            description: "Optional content/body for the note.",
           },
         },
         required: ["title", "category"],
@@ -80,11 +82,11 @@ const tools: OpenAI.ChatCompletionTool[] = [
         properties: {
           title: {
             type: "string",
-            description: "The title of the task. Must be explicitly provided by the user. NEVER guess or make up a title.",
+            description: "The title of the task. Must be explicitly provided by the user.",
           },
           dueDate: {
             type: "string",
-            description: "The due date for the task in YYYY-MM-DD format. Must be explicitly provided by the user. NEVER guess or make up a date.",
+            description: "The due date for the task in YYYY-MM-DD format. Must be explicitly provided by the user.",
           },
         },
         required: ["title", "dueDate"],
@@ -93,49 +95,46 @@ const tools: OpenAI.ChatCompletionTool[] = [
   },
 ];
 
-// ====== Execute function calls (server-side) ======
-function executeCreateTask(args: { title: string; dueDate?: string }) {
-  const task = {
-    id: Date.now(),
-    title: args.title,
-    done: false,
-    content: "Created via Fox Sensei chat",
-    deadline: args.dueDate || undefined,
-  };
-
-  // Save to localStorage (shared with Task Tracker)
-  try {
-    const existing = JSON.parse(localStorage.getItem("studyspace_tasks_all") || "[]");
-    localStorage.setItem("studyspace_tasks_all", JSON.stringify([...existing, task]));
-  } catch {}
-
-  return { success: true, task };
+// ====== Save to Firestore (server-side, Admin SDK) ======
+async function saveTaskToFirestore(userId: string, task: { id: number; title: string; done: boolean; content: string; deadline?: string }): Promise<boolean> {
+  if (adminDb) {
+    try {
+      await adminDb.collection("tasks").doc(String(task.id)).set({
+        ...task,
+        userId,
+        source: "chatbot",
+        createdAt: new Date().toISOString(),
+      });
+      console.log(`[chat] Task saved to Firestore: ${task.id}`);
+      return true;
+    } catch (err) {
+      console.error("[chat] Failed to save task to Firestore:", err);
+    }
+  }
+  return false;
 }
 
-function executeCreateNote(args: { title: string; category: string; content?: string }) {
-  const note = {
-    id: Date.now(),
-    title: args.title,
-    category: args.category,
-    tag: "Note",
-    date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    excerpt: (args.content || "").slice(0, 80) + ((args.content || "").length > 80 ? "..." : "") || "Created via Fox Sensei chat",
-    fullContent: args.content || "",
-    fullWidth: false,
-  };
-
-  // Save to localStorage (shared with Notes page)
-  try {
-    const existing = JSON.parse(localStorage.getItem("studyspace_notes") || "[]");
-    localStorage.setItem("studyspace_notes", JSON.stringify([note, ...existing]));
-  } catch {}
-
-  return { success: true, note };
+async function saveNoteToFirestore(userId: string, note: { id: number; title: string; category: string; tag: string; date: string; excerpt: string; fullContent: string; fullWidth: boolean }): Promise<boolean> {
+  if (adminDb) {
+    try {
+      await adminDb.collection("notes").doc(String(note.id)).set({
+        ...note,
+        userId,
+        source: "chatbot",
+        createdAt: new Date().toISOString(),
+      });
+      console.log(`[chat] Note saved to Firestore: ${note.id}`);
+      return true;
+    } catch (err) {
+      console.error("[chat] Failed to save note to Firestore:", err);
+    }
+  }
+  return false;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, context } = await req.json();
+    const { messages, context, userId } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages are required" }, { status: 400 });
@@ -161,9 +160,7 @@ export async function POST(req: NextRequest) {
 CRITICAL RULES — ANTI-HALLUCINATION:
 - You have access to the user's app data below. Use ONLY this data to answer questions about their notes, tasks, and schedule.
 - NEVER make up, guess, or fabricate information. If the data doesn't contain an answer, say "I don't see that in your current notes/tasks" and suggest they add it.
-- Do NOT invent note titles, task names, or event details that aren't in the provided data.
 - When referencing data, use the EXACT names and details from the context.
-- If asked about something not in the data, clearly state it's not found.
 
 CONVERSATIONAL DATA GATHERING — Creating Notes and Tasks:
 When a user wants to create a note or task, you MUST gather ALL required fields BEFORE calling any function. Do NOT call the function until the user has provided every required parameter.
@@ -183,17 +180,14 @@ User: "Meeting agenda."
 You: "Got it. What category should this note be under?"
 User: "Work."
 You: *calls create_note with title="Meeting agenda", category="Work"*
-You: "✅ Note 'Meeting agenda' has been created in the 'Work' category!"
+You: "Note 'Meeting agenda' has been created in the 'Work' category!"
 
-IMPORTANT: Do NOT call the function until the user has provided ALL required parameters. If a parameter is missing, ask the user for it. NEVER guess or auto-fill missing values.
-
-After successfully creating a note or task, confirm it was created and mention the exact title and category/due date used.
+IMPORTANT: Do NOT call the function until the user has provided ALL required parameters. NEVER guess or auto-fill missing values.
 
 FORMATTING RULES:
 - Use Markdown for ALL responses. Bold key terms with **text**, italics with *text*.
 - NEVER write long, dense paragraphs. Keep paragraphs to 1-2 sentences max.
 - Use bullet points (-) for lists, summaries, task lists, and step-by-step instructions.
-- When listing the user's notes, tasks, or events, ALWAYS use bullet points — one per item.
 - Keep responses concise and scannable.
 
 ${contextString}`;
@@ -224,12 +218,39 @@ ${contextString}`;
       const functionName = toolCallTyped.function.name;
       const functionArgs = JSON.parse(toolCallTyped.function.arguments || "{}");
 
-      let toolResult: { success: boolean; task?: unknown; note?: unknown };
+      console.log(`[chat] Tool call: ${functionName} with args:`, functionArgs);
+
+      let toolResult: { success: boolean; task?: unknown; note?: unknown; error?: string };
 
       if (functionName === "create_task") {
-        toolResult = executeCreateTask(functionArgs);
+        const task = {
+          id: Date.now(),
+          title: functionArgs.title,
+          done: false,
+          content: "Created via Fox Sensei chat",
+          deadline: functionArgs.dueDate || undefined,
+        };
+
+        // Save to Firestore
+        const saved = userId ? await saveTaskToFirestore(userId, task) : false;
+        toolResult = { success: saved, task };
+        console.log(`[chat] create_task result: saved=${saved}, task=${task.title}`);
       } else if (functionName === "create_note") {
-        toolResult = executeCreateNote(functionArgs);
+        const note = {
+          id: Date.now(),
+          title: functionArgs.title,
+          category: functionArgs.category,
+          tag: "Note",
+          date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          excerpt: (functionArgs.content || "").slice(0, 80) || "Created via Fox Sensei chat",
+          fullContent: functionArgs.content || "",
+          fullWidth: false,
+        };
+
+        // Save to Firestore
+        const saved = userId ? await saveNoteToFirestore(userId, note) : false;
+        toolResult = { success: saved, note };
+        console.log(`[chat] create_note result: saved=${saved}, note=${note.title}`);
       } else {
         return NextResponse.json({ ok: true, reply: "I'm not sure how to do that yet." });
       }
