@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   FileText, Plus, Upload, Layers, X, FileUp, HelpCircle,
-  Trash2, Mic, Loader2, ListPlus, ChevronLeft, ChevronRight, Check, Settings2,
+  Trash2, Mic, Loader2, ListPlus, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, Settings2,
   Video, Play, Link2, File, Save, Pencil,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -44,6 +44,7 @@ export default function NotesPage() {
   const [videoUrl, setVideoUrl] = useState("");
   const [showVideoUrlInput, setShowVideoUrlInput] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  const [materialOpen, setMaterialOpen] = useState(false);
   const [pdfText, setPdfText] = useState<string>("");
 
   // Full-width editor mode
@@ -236,6 +237,7 @@ export default function NotesPage() {
       setFlashcardIndex(0);
       setFlashcardFlipped(false);
       setQuizAnswers({});
+      setMaterialOpen(false);
       if (note.pdfData) {
         setAttachments([{
           id: `loaded-${note.id}`,
@@ -585,13 +587,38 @@ export default function NotesPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* LEFT: Materials + Note Content (read-only) */}
               <div className="space-y-4">
-                {/* PDF / Materials */}
+                {/* PDF / Materials — collapsible */}
                 {expandedNote.pdfData && (
                   <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
-                    <div className="bg-red-50 px-3 py-2 text-xs font-medium text-red-500 flex items-center gap-1.5">
-                      <FileUp className="h-3.5 w-3.5" /> {expandedNote.pdfName || "PDF Document"}
-                    </div>
-                    <iframe src={expandedNote.pdfData} className="h-[500px] w-full" title={expandedNote.pdfName || "PDF"} />
+                    <button
+                      onClick={() => setMaterialOpen(!materialOpen)}
+                      className="w-full bg-red-50 px-3 py-2.5 text-xs font-medium text-red-500 flex items-center justify-between hover:bg-red-100 transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <FileUp className="h-3.5 w-3.5" /> {expandedNote.pdfName || "PDF Document"}
+                      </span>
+                      {materialOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+                    {materialOpen && (
+                      <iframe src={expandedNote.pdfData} className="h-[500px] w-full" title={expandedNote.pdfName || "PDF"} />
+                    )}
+                  </div>
+                )}
+
+                {/* Attachments from edit mode */}
+                {noteViewMode === "view" && attachments.length > 0 && !expandedNote.pdfData && (
+                  <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
+                    {attachments.map((att) => (
+                      <div key={att.id} className="px-3 py-2 flex items-center gap-2 border-b border-ivory-deep/30 last:border-0">
+                        {att.type === "pdf" && <FileUp className="h-4 w-4 text-red-400" />}
+                        {att.type === "pptx" && <File className="h-4 w-4 text-orange-500" />}
+                        {att.type === "video" && <Video className="h-4 w-4 text-blue-500" />}
+                        <span className="flex-1 truncate text-xs text-ink">{att.name}</span>
+                        <button onClick={() => setPreviewAttachment(att)} className="flex items-center gap-1 text-xs text-moss hover:text-moss-dark">
+                          <Play className="h-3 w-3" /> Open
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
 
