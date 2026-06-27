@@ -124,8 +124,9 @@ function ProtectedApp() {
         }`}
         style={{ "--sidebar-width": sidebarCollapsed ? "4rem" : "16rem" } as React.CSSProperties}
       >
-        {/* Top header bar: Language toggle (right) */}
-        <header className="sticky top-0 z-30 flex items-center justify-end border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
+        {/* Top header bar: Focus Session widget (left) + Language toggle (right) */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ivory-deep/40 bg-ivory/90 px-10 py-3 backdrop-blur-lg">
+          <FocusSessionWidget />
           <LanguageToggle />
         </header>
 
@@ -136,9 +137,6 @@ function ProtectedApp() {
 
       {/* Floating chatbot — always at bottom-right */}
       <FloatingChatbot />
-
-      {/* Global Focus Session widget — persists across pages */}
-      <FocusSessionWidget />
     </div>
   );
 }
