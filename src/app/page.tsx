@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import "@/lib/i18n";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
+import { FocusSessionProvider } from "@/lib/FocusSessionContext";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import Sidebar, { type TabId } from "@/components/Sidebar";
 import LanguageToggle from "@/components/LanguageToggle";
 import FloatingChatbot from "@/components/FloatingChatbot";
+import FocusSessionWidget from "@/components/FocusSessionWidget";
 import HomePage from "@/components/pages/HomePage";
 import NotesPage from "@/components/pages/NotesPage";
 import TasksPage from "@/components/pages/TasksPage";
@@ -134,6 +136,9 @@ function ProtectedApp() {
 
       {/* Floating chatbot — always at bottom-right */}
       <FloatingChatbot />
+
+      {/* Global Focus Session widget — persists across pages */}
+      <FocusSessionWidget />
     </div>
   );
 }
@@ -141,7 +146,9 @@ function ProtectedApp() {
 export default function App() {
   return (
     <AuthProvider>
-      <ProtectedApp />
+      <FocusSessionProvider>
+        <ProtectedApp />
+      </FocusSessionProvider>
     </AuthProvider>
   );
 }
