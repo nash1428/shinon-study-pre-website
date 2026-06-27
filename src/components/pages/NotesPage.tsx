@@ -585,8 +585,22 @@ export default function NotesPage() {
           {/* ====== VIEW MODE: Split-screen layout (1:2 ratio) ====== */}
           {noteViewMode === "view" ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* LEFT (1/3): PDF/Materials + Anki Cards + Quiz */}
-              <div className="lg:col-span-1 space-y-6">
+              {/* LEFT (1/3): Note Content (read-only, rendered) */}
+              <div className="lg:col-span-1 space-y-4">
+                {expandedNote.fullContent ? (
+                  <div className="rounded-xl bg-white p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
+                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Note Content</h3>
+                    <RichContent content={expandedNote.fullContent} />
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-white p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40 text-center">
+                    <p className="text-sm text-ink-muted italic">No content yet. Click "Edit" to add content.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT (2/3): PDF/Materials + Anki Cards + Quiz */}
+              <div className="lg:col-span-2 space-y-6">
                 {/* PDF / Materials — collapsible */}
                 {expandedNote.pdfData && (
                   <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
@@ -725,21 +739,6 @@ export default function NotesPage() {
                     <Layers className="mx-auto mb-2 h-8 w-8 text-ink-muted/40" />
                     <p className="text-sm text-ink-muted">No study materials yet.</p>
                     <p className="mt-1 text-xs text-ink-muted/60">Click "Edit" to generate Anki cards and quizzes with AI.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* RIGHT (2/3): Note Content (read-only, rendered) */}
-              <div className="lg:col-span-2 space-y-4">
-                {/* Note content (read-only, rendered) */}
-                {expandedNote.fullContent ? (
-                  <div className="rounded-xl bg-white p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
-                    <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Note Content</h3>
-                    <RichContent content={expandedNote.fullContent} />
-                  </div>
-                ) : (
-                  <div className="rounded-xl bg-white p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40 text-center">
-                    <p className="text-sm text-ink-muted italic">No content yet. Click "Edit" to add content.</p>
                   </div>
                 )}
               </div>
