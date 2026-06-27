@@ -543,21 +543,6 @@ export default function HomePage() {
                                       {event.location && <div className="flex items-center gap-2"><MapPin className="h-3 w-3 text-ink-muted" /><span className="text-xs text-ink-soft">{event.location}</span></div>}
                                     </div>
                                     <div className="mt-3 border-t border-moss/10 pt-3">
-                                      <span className="mb-1.5 block text-[10px] font-medium text-ink-muted">{isJp ? "講義PDF" : "Lecture PDF"}</span>
-                                      {lectureData.pdfName ? (
-                                        <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2">
-                                          <FileText className="h-4 w-4 text-maple" />
-                                          <span className="flex-1 text-xs text-ink">{lectureData.pdfName}</span>
-                                          <button onClick={() => updateLectureData(lectureId, { pdfName: null })} className="text-ink-muted hover:text-maple"><X className="h-3 w-3" /></button>
-                                        </div>
-                                      ) : (
-                                        <button onClick={() => updateLectureData(lectureId, { pdfName: "lecture_notes.pdf" })}
-                                          className="flex items-center gap-1.5 rounded-lg border border-dashed border-ivory-deep px-3 py-2 text-xs text-ink-muted hover:border-moss/30 hover:text-moss transition-colors">
-                                          <FileText className="h-3 w-3" />{isJp ? "PDFを添付" : "Attach Lecture PDF"}
-                                        </button>
-                                      )}
-                                    </div>
-                                    <div className="mt-3 border-t border-moss/10 pt-3">
                                       <span className="mb-1 block text-[10px] font-medium text-ink-muted">{isJp ? "ノート" : "Quick Notes"}</span>
                                       <textarea value={lectureData.note} onChange={(e) => updateLectureData(lectureId, { note: e.target.value })}
                                         placeholder={isJp ? "ここにノートを書く..." : "Type your notes here..."}
