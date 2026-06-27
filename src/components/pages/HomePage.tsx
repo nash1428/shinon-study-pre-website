@@ -74,6 +74,23 @@ export default function HomePage() {
 
   // Local events (separate from Google Calendar)
   const [localEvents, setLocalEvents] = useLocalStorage<LocalEvent[]>("studyspace_local_events", []);
+
+  // Lecture notes — read from localStorage to show on calendar + timeline
+  const [allNotes, setAllNotes] = useLocalStorage<{ id: number; title: string; lectureDate?: string; category?: string }[]>("studyspace_notes", []);
+
+  // Map of lecture notes by date key (for calendar dots + timeline)
+  const notesByDate = useMemo(() => {
+    const map: Record<string, { id: number; title: string; category?: string }[]> = {};
+    allNotes.forEach((n) => {
+      if (n.lectureDate) {
+        const [y, m, d] = n.lectureDate.split("-").map(Number);
+        const key = dateKey(y, m - 1, d);
+        if (!map[key]) map[key] = [];
+        map[key].push({ id: n.id, title: n.title, category: n.category });
+      }
+    });
+    return map;
+  }, [allNotes]);
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [newEventTitle, setNewEventTitle] = useState("");
@@ -408,7 +425,8 @@ export default function HomePage() {
                       : cell.isCurrentMonth ? "text-ink hover:bg-ivory-warm/50 cursor-pointer"
                       : "text-ink-muted/40 hover:bg-ivory-warm/30 cursor-pointer"}`}>
                     {cell.day}
-                    {hasEvent && !isSelected && !isToday && <div className="absolute bottom-1 h-1 w-1 rounded-full bg-gold" />}
+                    {hasEvent && !isSelected && !isToday && <div className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-gold" />}
+                    {notesByDate[key] && notesByDate[key].length > 0 && !isSelected && !isToday && <div className="absolute bottom-1 left-[60%] h-1 w-1 rounded-full bg-blue-500" />}
                   </button>
                 );
               })}
@@ -455,6 +473,7 @@ export default function HomePage() {
             <div className="mt-4 flex items-center gap-4 border-t border-ivory-deep/40 pt-3">
               <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-moss" /><span className="text-[11px] text-ink-muted">{t("home.calendar.today")}</span></div>
               <div className="flex items-center gap-1.5"><div className="h-1 w-1 rounded-full bg-gold" /><span className="text-[11px] text-ink-muted">{t("home.calendar.hasEvents")}</span></div>
+              <div className="flex items-center gap-1.5"><div className="h-1 w-1 rounded-full bg-blue-500" /><span className="text-[11px] text-ink-muted">Lecture notes</span></div>
             </div>
           </div>
         </div>
@@ -613,6 +632,29 @@ export default function HomePage() {
                       );
                     })}
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Today's Lecture Notes — notes tagged with today's date */}
+        {notesByDate[todayKey] && notesByDate[todayKey].length > 0 && (
+          <div className="mt-6 rounded-2xl bg-white/80 p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
+            <h2 className="mb-4 font-serif text-lg font-semibold text-ink flex items-center gap-2">
+              <FileText className="h-4 w-4 text-blue-500" />
+              Today's Lecture Notes
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-500">{notesByDate[todayKey].length}</span>
+            </h2>
+            <div className="space-y-2">
+              {notesByDate[todayKey].map((note) => (
+                <div key={note.id} className="flex items-center gap-3 rounded-xl bg-blue-50/30 px-4 py-3">
+                  <FileText className="h-4 w-4 shrink-0 text-blue-500" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-ink">{note.title}</p>
+                    {note.category && <p className="text-[11px] text-ink-muted">{note.category}</p>}
+                  </div>
+                  <span className="text-[10px] text-blue-500">Lecture note</span>
                 </div>
               ))}
             </div>

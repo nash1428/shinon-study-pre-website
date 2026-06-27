@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   FileText, Plus, Upload, Layers, X, FileUp, HelpCircle,
   Trash2, Mic, Loader2, ListPlus, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, Settings2,
-  Video, Play, Link2, File, Save, Pencil,
+  Video, Play, Link2, File, Save, Pencil, Calendar,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { recentNotes as initialNotes, type NoteItem, type AnkiCard, type QuizQuestion } from "@/lib/data";
@@ -28,6 +28,7 @@ export default function NotesPage() {
   const [newBody, setNewBody] = useState("");
   const [widthMode, setWidthMode] = useState<WidthMode>("standard");
   const [newCategory, setNewCategory] = useState("");
+  const [newLectureDate, setNewLectureDate] = useState("");
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
 
@@ -128,6 +129,7 @@ export default function NotesPage() {
     setNewTitle("");
     setNewBody("");
     setNewCategory("");
+    setNewLectureDate("");
     setAttachments([]);
     setVideoUrl("");
     setShowVideoUrlInput(false);
@@ -208,6 +210,7 @@ export default function NotesPage() {
       fullWidth: true,
       pdfData: firstPdf?.data || undefined,
       pdfName: firstPdf?.name || undefined,
+      lectureDate: newLectureDate || undefined,
     };
     setNotes([newNote, ...notes]);
     if (user) {
@@ -579,6 +582,18 @@ export default function NotesPage() {
             )}
             {expandedNote.quizQuestions && expandedNote.quizQuestions.length > 0 && (
               <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] text-blue-500">{expandedNote.quizQuestions.length} quiz</span>
+            )}
+            {/* Lecture Date — links note to a calendar day */}
+            {noteViewMode === "edit" ? (
+              <input
+                type="date"
+                value={expandedNote.lectureDate || ""}
+                onChange={(e) => updateNoteField(expandedNote.id, "lectureDate", e.target.value)}
+                className="rounded-lg border border-ivory-deep bg-white px-2 py-0.5 text-xs text-ink-soft focus:border-moss/30 focus:outline-none"
+                title="Lecture date"
+              />
+            ) : (
+              expandedNote.lectureDate && <span className="flex items-center gap-0.5 text-[10px] text-blue-500"><Calendar className="h-2.5 w-2.5" />{expandedNote.lectureDate}</span>
             )}
           </div>
 
@@ -1035,6 +1050,7 @@ export default function NotesPage() {
 
             <div className="mt-4 flex items-center gap-1.5 text-xs text-ink-muted">
               <FileText className="h-3 w-3" /> {note.date}
+              {note.lectureDate && <span className="flex items-center gap-0.5 text-blue-500"><Calendar className="h-2.5 w-2.5" />{note.lectureDate}</span>}
               {note.category && <span className="ml-2 rounded-full bg-ivory-warm px-2 py-0.5 text-[9px]">{note.category}</span>}
             </div>
           </div>
@@ -1072,6 +1088,11 @@ export default function NotesPage() {
                   <datalist id="category-list">
                     {categories.map((cat) => (<option key={cat} value={cat} />))}
                   </datalist>
+                </div>
+                <div className="w-40">
+                  <label className="mb-1.5 block text-xs font-medium text-ink-muted">Lecture date</label>
+                  <input type="date" value={newLectureDate} onChange={(e) => setNewLectureDate(e.target.value)}
+                    className="w-full rounded-xl border border-ivory-deep bg-white px-3 py-3 text-sm text-ink focus:border-moss/30 focus:outline-none focus:ring-2 focus:ring-moss/10" />
                 </div>
               </div>
 

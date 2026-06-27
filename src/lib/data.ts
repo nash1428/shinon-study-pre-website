@@ -70,6 +70,7 @@ export type NoteItem = {
   ankiCards?: AnkiCard[];
   quizQuestions?: QuizQuestion[];
   courseTabs?: CourseTab[];
+  lectureDate?: string; // YYYY-MM-DD — which day's lecture this note belongs to
 };
 
 export const recentNotes: NoteItem[] = [
