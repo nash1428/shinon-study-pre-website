@@ -582,11 +582,46 @@ export default function NotesPage() {
             )}
           </div>
 
-          {/* ====== VIEW MODE: Split-screen layout ====== */}
+          {/* ====== VIEW MODE: Split-screen layout (1:2 ratio) ====== */}
           {noteViewMode === "view" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* LEFT: Anki Cards + Quiz (interactive study tools) */}
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* LEFT (1/3): PDF/Materials + Anki Cards + Quiz */}
+              <div className="lg:col-span-1 space-y-6">
+                {/* PDF / Materials — collapsible */}
+                {expandedNote.pdfData && (
+                  <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
+                    <button
+                      onClick={() => setMaterialOpen(!materialOpen)}
+                      className="w-full bg-red-50 px-3 py-2.5 text-xs font-medium text-red-500 flex items-center justify-between hover:bg-red-100 transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <FileUp className="h-3.5 w-3.5" /> {expandedNote.pdfName || "PDF Document"}
+                      </span>
+                      {materialOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+                    {materialOpen && (
+                      <iframe src={expandedNote.pdfData} className="h-[400px] w-full" title={expandedNote.pdfName || "PDF"} />
+                    )}
+                  </div>
+                )}
+
+                {/* Attachments from edit mode */}
+                {noteViewMode === "view" && attachments.length > 0 && !expandedNote.pdfData && (
+                  <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
+                    {attachments.map((att) => (
+                      <div key={att.id} className="px-3 py-2 flex items-center gap-2 border-b border-ivory-deep/30 last:border-0">
+                        {att.type === "pdf" && <FileUp className="h-4 w-4 text-red-400" />}
+                        {att.type === "pptx" && <File className="h-4 w-4 text-orange-500" />}
+                        {att.type === "video" && <Video className="h-4 w-4 text-blue-500" />}
+                        <span className="flex-1 truncate text-xs text-ink">{att.name}</span>
+                        <button onClick={() => setPreviewAttachment(att)} className="flex items-center gap-1 text-xs text-moss hover:text-moss-dark">
+                          <Play className="h-3 w-3" /> Open
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Anki Flashcards */}
                 {expandedNote.ankiCards && expandedNote.ankiCards.length > 0 && currentCard && (
                   <div className="rounded-xl bg-white p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
@@ -694,43 +729,8 @@ export default function NotesPage() {
                 )}
               </div>
 
-              {/* RIGHT: Materials + Note Content (read-only) */}
-              <div className="space-y-4">
-                {/* PDF / Materials — collapsible */}
-                {expandedNote.pdfData && (
-                  <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
-                    <button
-                      onClick={() => setMaterialOpen(!materialOpen)}
-                      className="w-full bg-red-50 px-3 py-2.5 text-xs font-medium text-red-500 flex items-center justify-between hover:bg-red-100 transition-colors"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <FileUp className="h-3.5 w-3.5" /> {expandedNote.pdfName || "PDF Document"}
-                      </span>
-                      {materialOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-                    {materialOpen && (
-                      <iframe src={expandedNote.pdfData} className="h-[500px] w-full" title={expandedNote.pdfName || "PDF"} />
-                    )}
-                  </div>
-                )}
-
-                {/* Attachments from edit mode */}
-                {noteViewMode === "view" && attachments.length > 0 && !expandedNote.pdfData && (
-                  <div className="rounded-xl border border-ivory-deep/40 overflow-hidden">
-                    {attachments.map((att) => (
-                      <div key={att.id} className="px-3 py-2 flex items-center gap-2 border-b border-ivory-deep/30 last:border-0">
-                        {att.type === "pdf" && <FileUp className="h-4 w-4 text-red-400" />}
-                        {att.type === "pptx" && <File className="h-4 w-4 text-orange-500" />}
-                        {att.type === "video" && <Video className="h-4 w-4 text-blue-500" />}
-                        <span className="flex-1 truncate text-xs text-ink">{att.name}</span>
-                        <button onClick={() => setPreviewAttachment(att)} className="flex items-center gap-1 text-xs text-moss hover:text-moss-dark">
-                          <Play className="h-3 w-3" /> Open
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
+              {/* RIGHT (2/3): Note Content (read-only, rendered) */}
+              <div className="lg:col-span-2 space-y-4">
                 {/* Note content (read-only, rendered) */}
                 {expandedNote.fullContent ? (
                   <div className="rounded-xl bg-white p-6 shadow-[var(--shadow-card)] border border-ivory-deep/40">
