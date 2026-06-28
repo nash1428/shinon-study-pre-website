@@ -187,15 +187,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 4. Try fetching from Firestore via server API (uses ID token for auth)
     try {
       const idToken = await firebaseUser.getIdToken();
-      if (!guardSession()) return; // Session changed while awaiting
+      if (!guardSession()) return;
 
       const serverProfile = await fetchProfileFromServer(idToken, uid);
-      if (!guardSession()) return; // Session changed while fetching
+      if (!guardSession()) return;
 
       if (serverProfile) {
-        profileCacheRef.current.set(uid, serverProfile);
-        if (guardSession()) setProfile(serverProfile);
-        saveProfileToStorage(uid, serverProfile);
+        // MERGE: Don't overwrite local data with stale server data.
+        // The server profile doesn't have avatarUrl (stripped to save space).
+        // Preserve avatarUrl and any other fields from the local profile
+        // that are missing or empty in the server profile.
+        const mergedProfile: UserProfile = {
+          ...defaultProfile,
+          ...serverProfile,
+          // Preserve local-only fields that server doesn't have
+          avatarUrl: localProfile?.avatarUrl ?? serverProfile.avatarUrl ?? null,
+        };
+
+        profileCacheRef.current.set(uid, mergedProfile);
+        if (guardSession()) setProfile(mergedProfile);
+        saveProfileToStorage(uid, mergedProfile);
+        console.log("[AuthContext] Loaded profile from server + merged with local for", uid);
       }
     } catch {
       // Server fetch failed — keep whatever we have from localStorage or temp
@@ -206,13 +218,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const docRef = doc(db, "users", uid);
         const docSnap = await getDoc(docRef);
-        if (!guardSession()) return; // Session changed while awaiting
+        if (!guardSession()) return;
 
         if (docSnap.exists()) {
           const fetched = docSnap.data() as UserProfile;
-          profileCacheRef.current.set(uid, fetched);
-          if (guardSession()) setProfile(fetched);
-          saveProfileToStorage(uid, fetched);
+          // Same merge logic: preserve local avatarUrl
+          const currentLocal = loadProfileFromStorage(uid);
+          const mergedProfile: UserProfile = {
+            ...defaultProfile,
+            ...fetched,
+            avatarUrl: currentLocal?.avatarUrl ?? fetched.avatarUrl ?? null,
+          };
+
+          profileCacheRef.current.set(uid, mergedProfile);
+          if (guardSession()) setProfile(mergedProfile);
+          saveProfileToStorage(uid, mergedProfile);
+          console.log("[AuthContext] Loaded profile from Firestore client SDK + merged for", uid);
         }
       } catch {
         // Firestore client SDK failed — keep existing profile

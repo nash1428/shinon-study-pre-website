@@ -11,9 +11,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Strip avatarUrl before saving to Firestore — base64 data URLs can be
+    // 1MB+ which exceeds Firestore's 1MB document limit and causes the ENTIRE
+    // save to fail (losing degree, hometown, etc.). Avatar stays in localStorage.
+    const { avatarUrl, ...profileWithoutAvatar } = profile;
+
     // Convert profile to Firestore document format
     const fields: Record<string, { stringValue?: string; booleanValue?: boolean; nullValue?: null }> = {};
-    for (const [key, value] of Object.entries(profile)) {
+    for (const [key, value] of Object.entries(profileWithoutAvatar)) {
       if (value === null) {
         fields[key] = { nullValue: null };
       } else if (typeof value === "boolean") {
@@ -26,8 +31,8 @@ export async function POST(req: NextRequest) {
     // Try Admin SDK first (bypasses security rules)
     if (adminDb) {
       try {
-        await adminDb.collection("users").doc(uid).set(profile, { merge: true });
-        console.log("[save-profile] Saved via Admin SDK for", uid);
+        await adminDb.collection("users").doc(uid).set(profileWithoutAvatar, { merge: true });
+        console.log("[save-profile] Saved via Admin SDK for", uid, "(avatarUrl stripped)");
         return NextResponse.json({ ok: true });
       } catch (err) {
         console.warn("[save-profile] Admin SDK failed, trying REST API");
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Firestore write failed", status: res.status }, { status: 500 });
     }
 
-    console.log("[save-profile] Saved via REST API for", uid);
+    console.log("[save-profile] Saved via REST API for", uid, "(avatarUrl stripped)");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[save-profile] Failed:", err);
