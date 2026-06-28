@@ -94,11 +94,44 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed, onToggleC
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Convert to base64 data URL so it survives page refresh
+      // Compress and resize the image using canvas before saving as base64.
+      // This prevents the base64 string from exceeding localStorage/Firestore limits.
+      const img = new Image();
       const reader = new FileReader();
       reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        setDraft({ ...draft, avatarUrl: dataUrl });
+        img.src = reader.result as string;
+      };
+      img.onload = () => {
+        // Resize to max 256x256, maintaining aspect ratio
+        const maxSize = 256;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+        }
+
+        // Draw to canvas
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Export as JPEG with 0.7 quality (much smaller than PNG base64)
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          setDraft({ ...draft, avatarUrl: compressedDataUrl });
+        } else {
+          // Fallback: use original (rare)
+          setDraft({ ...draft, avatarUrl: reader.result as string });
+        }
       };
       reader.readAsDataURL(file);
     }

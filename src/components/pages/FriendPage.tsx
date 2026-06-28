@@ -152,6 +152,8 @@ export default function FriendPage() {
     setFriendListLoading(true);
     try {
       const idToken = await user.getIdToken();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
       const res = await fetch("/api/search-users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -160,7 +162,9 @@ export default function FriendPage() {
           currentUserId: user.uid,
           idToken,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await res.json();
       if (data.ok) {
         const friendsAndFollowing = data.users.filter((u: SearchResultUser) => u.isFriend || u.isFollowing);
@@ -170,7 +174,7 @@ export default function FriendPage() {
           showTodayTasks: true, showTodaySchedule: true,
           isFriend: u.isFriend, isFollowing: u.isFollowing,
         }));
-        // Merge: keep cached entries that aren't in the new list (in-memory registry updates)
+        // Merge: keep cached entries that aren't in the new list
         const mergedList = [...newList];
         friendList.forEach((cached) => {
           if (!mergedList.find((f) => f.id === cached.id)) {
@@ -178,13 +182,15 @@ export default function FriendPage() {
           }
         });
         setFriendList(mergedList);
-        // Save incoming requests
         if (data.incomingRequests) {
           setIncomingRequests(data.incomingRequests);
         }
       }
-    } catch {}
-    setFriendListLoading(false);
+    } catch {
+      // Timeout or error — keep cached data, don't break UI
+    } finally {
+      setFriendListLoading(false);
+    }
   };
 
   // Fetch incoming friend requests (polls every 10 seconds)
@@ -192,6 +198,8 @@ export default function FriendPage() {
     if (!user) return;
     try {
       const idToken = await user.getIdToken();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
       const res = await fetch("/api/friend-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,7 +208,9 @@ export default function FriendPage() {
           currentUserId: user.uid,
           idToken,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await res.json();
       if (data.ok && data.requests) {
         setIncomingRequests(data.requests.map((req: { senderId: string; senderName: string; senderEmail: string; senderUniversity: string; senderAvatarUrl: string | null; senderIsPrivate: boolean }) => ({
@@ -212,7 +222,9 @@ export default function FriendPage() {
           isPrivate: req.senderIsPrivate,
         })));
       }
-    } catch {}
+    } catch {
+      // Silently fail — don't break the UI for polling
+    }
   };
 
   useEffect(() => {
@@ -235,6 +247,8 @@ export default function FriendPage() {
     setFriendData(null);
     try {
       const idToken = await user.getIdToken();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch("/api/friend-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -243,7 +257,9 @@ export default function FriendPage() {
           currentUserId: user.uid,
           idToken,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await res.json();
       if (data.ok) {
         setFriendData({
@@ -253,9 +269,22 @@ export default function FriendPage() {
           showTodaySchedule: data.showTodaySchedule,
           studyStats: data.studyStats,
         });
+      } else {
+        setFriendData({
+          tasks: [], events: [],
+          showTodayTasks: false, showTodaySchedule: false,
+          studyStats: undefined,
+        });
       }
-    } catch {}
-    setFriendDataLoading(false);
+    } catch {
+      setFriendData({
+        tasks: [], events: [],
+        showTodayTasks: false, showTodaySchedule: false,
+        studyStats: undefined,
+      });
+    } finally {
+      setFriendDataLoading(false);
+    }
   };
 
   const handleSearch = async () => {
@@ -265,6 +294,8 @@ export default function FriendPage() {
     try {
       let idToken = "";
       if (user) idToken = await user.getIdToken();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch("/api/search-users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -273,7 +304,9 @@ export default function FriendPage() {
           currentUserId: user?.uid || "currentUser",
           idToken,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const data = await res.json();
       if (data.ok) {
         setSearchResults(data.users);
@@ -293,25 +326,30 @@ export default function FriendPage() {
     setActionLoading(targetUserId);
     try {
       const idToken = await user.getIdToken();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
-      // Route friend request actions through the new friend-requests API
+      // Route friend request actions through the friend-requests API
       if (action === "send_request") {
         await fetch("/api/friend-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "send", currentUserId: user.uid, targetUserId, idToken }),
+          signal: controller.signal,
         });
       } else if (action === "accept_request") {
         await fetch("/api/friend-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "accept", currentUserId: user.uid, targetUserId, idToken }),
+          signal: controller.signal,
         });
       } else if (action === "reject_request") {
         await fetch("/api/friend-requests", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "decline", currentUserId: user.uid, targetUserId, idToken }),
+          signal: controller.signal,
         });
       } else {
         // Follow/unfollow/unconnect still use user-connections
@@ -319,8 +357,10 @@ export default function FriendPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action, currentUserId: user.uid, targetUserId, idToken }),
+          signal: controller.signal,
         });
       }
+      clearTimeout(timeout);
 
       // Update search results
       setSearchResults((prev) =>
@@ -353,8 +393,12 @@ export default function FriendPage() {
       if (action === "follow" || action === "accept_request") {
         fetchFriendList();
       }
-    } catch {}
-    setActionLoading(null);
+    } catch {
+      // Error or timeout — UI still works, just no server update
+      console.error("[handleConnection] Failed:", action, targetUserId);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   // Toggle privacy setting
