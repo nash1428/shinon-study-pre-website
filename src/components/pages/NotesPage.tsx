@@ -323,39 +323,154 @@ export default function NotesPage() {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   };
 
-  // Audio recording
+  // Audio recording — with proper error handling and timeouts
   const handleStartRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       audioChunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
       recorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach((t) => t.stop());
+
+        // Check size (20MB limit)
+        if (audioBlob.size > 20 * 1024 * 1024) {
+          setAudioSummarizing(false);
+          alert("Audio recording is too large (over 20MB). Try recording a shorter clip.");
+          return;
+        }
+
         setAudioSummarizing(true);
+
         try {
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const base64 = (reader.result as string).split(",")[1];
-            const res = await fetch("/api/audio-summarize", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm" }),
-            });
-            const data = await res.json();
-            if (data.summary) {
-              setNewBody((prev) => (prev ? prev + "\n\n" + data.summary : data.summary));
-            }
-            setAudioSummarizing(false);
-          };
-          reader.readAsDataURL(audioBlob);
-        } catch { setAudioSummarizing(false); }
+          // Convert to base64
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const result = reader.result as string;
+              const base64Data = result.split(",")[1];
+              if (base64Data) resolve(base64Data);
+              else reject(new Error("Failed to convert audio"));
+            };
+            reader.onerror = () => reject(new Error("FileReader error"));
+            reader.readAsDataURL(audioBlob);
+          });
+
+          // Send to API with timeout
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
+          const res = await fetch("/api/audio-summarize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ audioBase64: base64, mimeType: "audio/webm" }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            const errorMsg = data.error || "Failed to process audio";
+            console.error("[audio-summarize] API error:", errorMsg);
+            setNewBody((prev) => (prev ? prev + `\n\n⚠️ Audio summarization failed: ${errorMsg}` : `⚠️ Audio summarization failed: ${errorMsg}`));
+          } else if (data.summary) {
+            setNewBody((prev) => (prev ? prev + "\n\n" + data.summary : data.summary));
+          } else {
+            console.error("[audio-summarize] No summary in response");
+          }
+        } catch (err) {
+          console.error("[audio-summarize] Frontend error:", err);
+          const errorMsg = err instanceof Error && err.name === "AbortError"
+            ? "Audio processing timed out (60s). Try a shorter recording."
+            : "Failed to process audio. Please try again.";
+          setNewBody((prev) => (prev ? prev + `\n\n⚠️ ${errorMsg}` : `⚠️ ${errorMsg}`));
+        } finally {
+          setAudioSummarizing(false);
+        }
       };
+
       recorder.start();
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
-    } catch { setIsRecording(false); }
+    } catch (err) {
+      console.error("[audio-summarize] Microphone access denied:", err);
+      setIsRecording(false);
+      alert("Microphone access denied. Please allow microphone access in your browser settings.");
+    }
+  };
+
+  // Audio file upload handler (upload .mp3/.wav files)
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const handleAudioFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check type
+    const validTypes = ["audio/mp3", "audio/mpeg", "audio/wav", "audio/wave", "audio/x-wav", "audio/ogg", "audio/webm", "audio/m4a"];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|ogg|webm|m4a)$/i)) {
+      alert("Unsupported audio format. Please upload .mp3, .wav, .ogg, .webm, or .m4a files.");
+      e.target.value = "";
+      return;
+    }
+
+    // Check size (20MB limit)
+    if (file.size > 20 * 1024 * 1024) {
+      alert(`Audio file is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum is 20MB.`);
+      e.target.value = "";
+      return;
+    }
+
+    setAudioSummarizing(true);
+
+    try {
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          const base64Data = result.split(",")[1];
+          if (base64Data) resolve(base64Data);
+          else reject(new Error("Failed to convert audio file"));
+        };
+        reader.onerror = () => reject(new Error("FileReader error"));
+        reader.readAsDataURL(file);
+      });
+
+      // Send to API with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+
+      const res = await fetch("/api/audio-summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audioBase64: base64, mimeType: file.type || "audio/mpeg" }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const errorMsg = data.error || "Failed to process audio";
+        setNewBody((prev) => (prev ? prev + `\n\n⚠️ Audio summarization failed: ${errorMsg}` : `⚠️ Audio summarization failed: ${errorMsg}`));
+      } else if (data.summary) {
+        setNewBody((prev) => (prev ? prev + "\n\n" + data.summary : data.summary));
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error && err.name === "AbortError"
+        ? "Audio processing timed out (60s). Try a shorter file."
+        : "Failed to process audio file. Please try again.";
+      setNewBody((prev) => (prev ? prev + `\n\n⚠️ ${errorMsg}` : `⚠️ ${errorMsg}`));
+    } finally {
+      setAudioSummarizing(false);
+      e.target.value = "";
+    }
   };
 
   const handleStopRecording = () => {
@@ -1198,17 +1313,28 @@ export default function NotesPage() {
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-xs font-medium text-ink-muted">
                   <span>Note content</span>
-                  {!isRecording ? (
-                    <button onClick={handleStartRecording} disabled={audioSummarizing}
-                      className="flex items-center gap-1 rounded-lg bg-moss/10 px-2 py-1 text-[10px] font-medium text-moss transition-colors hover:bg-moss/20 disabled:opacity-50">
-                      <Mic className="h-3 w-3" /> {audioSummarizing ? "Summarizing..." : "Record Audio"}
-                    </button>
-                  ) : (
-                    <button onClick={handleStopRecording}
-                      className="flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[10px] font-medium text-red-500 animate-pulse">
-                      <span className="h-2 w-2 rounded-full bg-red-500" /> Stop Recording
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {/* Audio file upload */}
+                    <input ref={audioFileInputRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a" onChange={handleAudioFileUpload} className="hidden" />
+                    {!isRecording && !audioSummarizing && (
+                      <button onClick={() => audioFileInputRef.current?.click()}
+                        className="flex items-center gap-1 rounded-lg bg-moss/10 px-2 py-1 text-[10px] font-medium text-moss transition-colors hover:bg-moss/20">
+                        <Upload className="h-3 w-3" /> Upload Audio
+                      </button>
+                    )}
+                    {/* Record audio */}
+                    {!isRecording ? (
+                      <button onClick={handleStartRecording} disabled={audioSummarizing}
+                        className="flex items-center gap-1 rounded-lg bg-moss/10 px-2 py-1 text-[10px] font-medium text-moss transition-colors hover:bg-moss/20 disabled:opacity-50">
+                        <Mic className="h-3 w-3" /> {audioSummarizing ? "Summarizing..." : "Record Audio"}
+                      </button>
+                    ) : (
+                      <button onClick={handleStopRecording}
+                        className="flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-[10px] font-medium text-red-500 animate-pulse">
+                        <span className="h-2 w-2 rounded-full bg-red-500" /> Stop Recording
+                      </button>
+                    )}
+                  </div>
                 </label>
                 <textarea
                   value={newBody}
