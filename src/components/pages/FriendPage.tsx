@@ -121,7 +121,7 @@ export default function FriendPage() {
   const totalFollowers = friendList.filter(f => f.isFriend || f.isFollowing).length;
   const totalFollowing = friendList.length;
 
-  // Auto-register the current user
+  // Auto-register the current user — re-runs when focus stats or privacy settings change
   useEffect(() => {
     if (!user || !profile) return;
     user.getIdToken().then((idToken) => {
@@ -144,7 +144,7 @@ export default function FriendPage() {
         }),
       }).catch(() => {});
     });
-  }, [user, profile, showTodayTasks, showTodaySchedule]);
+  }, [user, profile, showTodayTasks, showTodaySchedule, focusCount, focusMinutes, totalPoints]);
 
   // Fetch friend list from Firestore (merges with cached localStorage data)
   const fetchFriendList = async () => {

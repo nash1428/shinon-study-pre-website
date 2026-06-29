@@ -58,17 +58,29 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
         method: "GET",
         headers: { "Authorization": `Bearer ${idToken}` },
       });
+      console.log(`[friend-data] REST fetch user ${uid}: ${res.status}`);
       if (res.ok) {
         const data = await res.json();
         const fields = data.fields || {};
         const getString = (k: string) => (fields[k] as { stringValue?: string })?.stringValue || "";
-        const getBool = (k: string) => (fields[k] as { booleanValue?: boolean })?.booleanValue ?? true;
+        const getBool = (k: string) => {
+          const v = fields[k];
+          if (v?.booleanValue !== undefined) return v.booleanValue;
+          // If field missing, default to true (sharing enabled)
+          return true;
+        };
         const getArray = (k: string) => {
           const v = fields[k] as { arrayValue?: { values?: { stringValue: string }[] } } | undefined;
           return v?.arrayValue?.values?.map((i) => i.stringValue).filter(Boolean) || [];
         };
+        const getInt = (k: string) => {
+          const v = fields[k];
+          if (v?.integerValue !== undefined) return parseInt(String(v.integerValue)) || 0;
+          const s = (fields[k] as { stringValue?: string })?.stringValue;
+          return s ? parseInt(s) || 0 : 0;
+        };
         const av = fields["avatarUrl"] as { stringValue?: string; nullValue?: unknown } | undefined;
-        return {
+        const user = {
           id: uid,
           name: getString("name"),
           email: getString("email"),
@@ -83,16 +95,29 @@ async function fetchUserFromFirestore(idToken: string, uid: string): Promise<Reg
           friendRequests: getArray("incomingRequests") || getArray("friendRequests"),
           incomingRequests: getArray("incomingRequests") || getArray("friendRequests"),
           outgoingRequests: getArray("outgoingRequests"),
-          focusCount: parseInt(getString("focusCount")) || 0,
-          focusMinutes: parseInt(getString("focusMinutes")) || 0,
-          totalPoints: parseInt(getString("totalPoints")) || 0,
+          focusCount: getInt("focusCount"),
+          focusMinutes: getInt("focusMinutes"),
+          totalPoints: getInt("totalPoints"),
           registeredAt: getString("registeredAt") || getString("updatedAt"),
         };
+        console.log(`[friend-data] REST user data: focusCount=${user.focusCount}, focusMinutes=${user.focusMinutes}, showTasks=${user.showTodayTasks}, showSchedule=${user.showTodaySchedule}`);
+        return user;
+      } else if (res.status === 403) {
+        console.warn("[friend-data] REST 403 — Firestore security rules blocking read");
+      } else if (res.status === 404) {
+        console.warn(`[friend-data] REST 404 — user ${uid} not found in Firestore`);
       }
-    } catch {}
+    } catch (err) {
+      console.warn("[friend-data] REST fetch failed:", err);
+    }
   }
 
-  return userRegistry.get(uid) || null;
+  // Fallback to in-memory registry
+  const registryUser = userRegistry.get(uid);
+  if (registryUser) {
+    console.log(`[friend-data] Using in-memory registry for ${uid}: focusCount=${registryUser.focusCount}, showTasks=${registryUser.showTodayTasks}`);
+  }
+  return registryUser || null;
 }
 
 /**
