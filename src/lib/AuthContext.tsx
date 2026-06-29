@@ -376,28 +376,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Update local state immediately
     setProfile(updatedProfile);
 
-    // Save to localStorage (per-user key) — always works
+    // Save to localStorage (per-user key) — always works, includes avatarUrl
     saveProfileToStorage(currentUser.uid, updatedProfile);
 
     // Update in-memory cache
     profileCacheRef.current.set(currentUser.uid, updatedProfile);
 
-    // Save to Firestore via server API — AWAIT it (was fire-and-forget before)
+    // Strip avatarUrl before saving to Firestore — base64 data URLs can exceed
+    // Firestore's 1MB document limit. Avatar stays in localStorage only.
+    const { avatarUrl, ...profileWithoutAvatar } = updatedProfile;
+
+    // Save to Firestore via server API — AWAIT it
     try {
       const idToken = await currentUser.getIdToken();
-      // GUARD: check again after await
       if (activeUidRef.current !== currentUser.uid) return;
       await saveProfileToServer(idToken, currentUser.uid, updatedProfile);
-      console.log("[AuthContext] Profile saved to server for", currentUser.uid);
+      console.log("[AuthContext] Profile saved to server API for", currentUser.uid);
     } catch (err) {
-      console.error("[AuthContext] Server save failed, localStorage backup used:", err);
+      console.error("[AuthContext] Server API save failed:", err);
     }
 
-    // Also try client SDK as backup (also await)
+    // Also try client SDK as backup — STRIP avatarUrl + use merge:true
+    // Without merge:true, setDoc REPLACES the entire document, wiping out
+    // focusCount, friends, followers, showTodayTasks, etc. that were saved
+    // separately by the register-user API.
     if (db) {
       try {
-        await setDoc(doc(db, "users", currentUser.uid), updatedProfile);
-        console.log("[AuthContext] Profile saved to Firestore client SDK for", currentUser.uid);
+        await setDoc(doc(db, "users", currentUser.uid), profileWithoutAvatar, { merge: true });
+        console.log("[AuthContext] Profile saved to Firestore client SDK for", currentUser.uid, "(avatarUrl stripped, merge:true)");
       } catch (err) {
         console.error("[AuthContext] Client SDK save failed:", err);
       }
