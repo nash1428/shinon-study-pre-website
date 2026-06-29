@@ -331,9 +331,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         saveProfileToServer(idToken, cred.user.uid, newProfile);
       } catch {}
 
-      // Also try client SDK
+      // Also try client SDK — strip avatarUrl + use merge:true
       if (db) {
-        setDoc(doc(db, "users", cred.user.uid), newProfile).catch(() => {});
+        const { avatarUrl: _av, ...profileWithoutAvatar } = newProfile;
+        setDoc(doc(db, "users", cred.user.uid), profileWithoutAvatar, { merge: true }).catch(() => {});
       }
     }
 
@@ -346,7 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     if (!isFirebaseConfigured || !auth) return;
 
-    // ====== FULL SESSION CLEANUP ======
+    // ====== SESSION CLEANUP ======
     // Invalidate all pending async operations
     sessionRef.current++;
     activeUidRef.current = null;
@@ -354,8 +355,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear in-memory cache
     profileCacheRef.current.clear();
 
-    // Clear all profile storage (all per-user keys + old shared key)
-    clearAllProfileStorage();
+    // NOTE: Do NOT clear localStorage profile data on logout!
+    // The per-user profile keys (studyspace_profile_{uid}) should persist
+    // so that when the user logs back in, their profile loads instantly
+    // from localStorage before Firestore fetches.
+    // The old clearAllProfileStorage() was deleting all profile data,
+    // causing personal info to disappear after logout + re-login.
 
     // Clear React state
     setUser(null);
